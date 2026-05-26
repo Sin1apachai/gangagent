@@ -176,25 +176,43 @@
 - Implement **1 provider** ก่อน (แนะนำ Claude)
 - ทดสอบ chat แบบง่ายๆ ได้
 
-### Phase 1 — Multi-Provider + Capability (สัปดาห์ 3-4)
+### Phase 1 — Multi-Provider + Capability + MCP + Migration (สัปดาห์ 3-4)
 - เพิ่ม GPT และ Gemini provider
 - สร้าง Capability system + config file
 - Capability Router + fallback policy
 - Tool schema adapter
+- **MCP Integration** (ดู §MCP Integration):
+  - MCP client (stdio + SSE) + tool registry
+  - `mcp_servers.yaml` config + bridge เข้า tool schema adapter
+  - CLI: `gang mcp {list,tools,test,reload}`
+- **Schema Migration foundation** (ดู §Schema Migration):
+  - linear versioned SQL migrations + `runner.py`
+  - CLI: `gang db {status,migrate,rollback,new}`
+  - Auto-backup before migrate (integration hook สำหรับ Phase 3)
 - Integration test ครอบทุก provider × capability
 
-### Phase 2 — Agent Lifecycle + Personality (สัปดาห์ 5-6)
+### Phase 2 — Agent Lifecycle + Personality + Prompt Library (สัปดาห์ 5-6)
 - Agent Registry + lifecycle states
 - Personality Engine (hybrid: hash + LLM + seed)
 - Naming flow + Reveal UX
 - Trait override
 - Persistence (เก็บ agent ไว้ใช้รอบหน้า)
+- **Prompt Library + Versioning** (ดู §Prompt Library + Versioning):
+  - `./data/prompts/` filesystem-backed, immutable versions, HEAD pointer
+  - Jinja2 templates per block (personality / role / skill / memory)
+  - Agent prompt bindings (pin version per block)
+  - CLI: `gang prompts {list,show,diff,new,set-head,pin}`
 
-### Phase 3 — Role/Skill + Memory + Backup + Profession (สัปดาห์ 7-8)
-- Skill registry + tool binding
+### Phase 3 — Role/Skill + Memory + RAG + Backup + Profession (สัปดาห์ 7-8)
+- Skill registry + tool binding (รวม MCP tools จาก Phase 1)
 - Role/Skill assignment flow
 - Memory system (short + long + structured) — เขียนลง `./data/`
 - Versioning ของ role/skill
+- **RAG Pipeline** (ดู §RAG Pipeline):
+  - Loaders (markdown + PDF เริ่ม → web/git ภายหลัง), chunker, embedder, retriever, reranker
+  - Collection model + per-agent attach ACL
+  - Citation enforcement → ลด hallucination
+  - CLI: `gang rag {collections,ingest,attach,search,stats,reindex}`
 - **Profession Template** (ดู §Profession Template):
   - `Profession` model + `ProfessionRegistry` (plug-in YAML)
   - `apply()` factory — one-time, sliding-out reference
@@ -210,8 +228,8 @@
   - Weekly restore drill (automated verify)
   - `docs/RECOVERY.md` runbook
 
-### Phase 4 — Notification System (สัปดาห์ 9)
-*(ดูรายละเอียดใน §Notification System)*
+### Phase 4 — Notification + Scheduled Tasks (สัปดาห์ 9)
+*(ดูรายละเอียดใน §Notification System และ §Scheduled Tasks)*
 - `INotifier` Protocol + `NotifierRegistry` (plug-in)
 - Implementations: Telegram, Discord, Line, Email (พร้อมกัน 4 ช่อง)
 - Config YAML (`data/configs/notifications.yaml`) + `${ENV_VAR}` interpolation
@@ -221,6 +239,11 @@
 - Hot reload (file watcher) + dry-run mode + healthcheck
 - CLI: `gang notify {list,test,dry-run,send,history,reload,mute}`
 - Event emitters ฝัง: backup events, watcher events (mediator events รอ Phase 5)
+- **Scheduled Tasks**:
+  - APScheduler + cron/interval/one-shot/event triggers
+  - `scheduled_tasks.yaml` config — agent + prompt + output channels
+  - Idempotent design + overlap skip + timezone-aware
+  - CLI: `gang schedule {list,add,disable,run,history,next}`
 
 ### Phase 5 — Inter-Agent + Orchestration (สัปดาห์ 10-11)
 - Message bus
@@ -228,12 +251,18 @@
 - Multi-agent workflow engine
 - **Mediator Agent** integrate กับ Phase 4 notifier (loop_detected → WARN, loop_unresolved → CRITICAL)
 
-### Phase 6 — Observability + Eval (สัปดาห์ 12-13)
+### Phase 6 — Observability + Eval + Guardrails (สัปดาห์ 12-13)
 - Cost/token tracking dashboard
 - Audit log expansion (รวม notification audit ที่มีอยู่)
 - Skill benchmark suite
 - Personality consistency test
 - Watcher Agent (provider changelog) — emit via Phase 4 notifier
+- **Guardrails / Safety Filter** (ดู §Guardrails):
+  - 3-layer defense: input / output / tool call
+  - Initial filters: prompt_injection, PII (Presidio), secret_leak
+  - Per-agent policy binding (default + sensitive presets)
+  - Violations log + notify CRITICAL on adversarial patterns
+  - CLI: `gang guardrails {list,test,violations}`
 
 ### Phase 7 — UI + Polish (สัปดาห์ 14+)
 - เลือก interface: CLI ก่อน → Web UI ภายหลัง
@@ -256,6 +285,12 @@
 | **Observability** | OpenTelemetry + simple dashboard |
 | **Backup** | restic (encrypted, dedup, GFS retention) |
 | **Notification** | `httpx` (Telegram/Discord/Line REST), `aiosmtplib` (email), `watchfiles` (hot reload) |
+| **MCP** | `mcp` Python SDK (official) — stdio + SSE transports |
+| **Prompt templating** | `jinja2` (versioned files ใน `./data/prompts/`) |
+| **RAG** | Chroma (มีอยู่) + `pypdf`/`markitdown` (loader) + `tiktoken` (chunker) + optional `cohere`/cross-encoder (rerank) |
+| **Scheduler** | `apscheduler` (local cron-like, async) |
+| **Guardrails** | `presidio-analyzer` (PII), regex-based prompt injection patterns + optional `rebuff` |
+| **DB Migration** | Light custom (linear SQL files) — ไม่ใช้ Alembic เต็ม |
 
 ---
 
@@ -287,6 +322,10 @@
 7. **Capability flag → if-else เยอะ** (ดูรายละเอียดในหมวด Design Patterns ด้านล่าง)
 8. **Data loss / Disaster recovery** (ดูรายละเอียดในหมวด Backup & Recovery ด้านล่าง)
 9. **Missed alerts / Alert fatigue** (ดูรายละเอียดในหมวด Notification System ด้านล่าง) — แจ้งเตือนพลาด CRITICAL หรือสแปมจนผู้ใช้ปิดทั้งหมด → ทั้งคู่ silent failure ที่อันตรายเท่ากัน
+10. **Prompt drift / Personality erosion** (ดูรายละเอียดในหมวด Prompt Library) — system prompt เปลี่ยนแบบไม่ได้ตั้งใจ → USP "ชื่อ → นิสัย" พังเงียบๆ
+11. **Prompt injection + Output leakage** (ดูรายละเอียดในหมวด Guardrails) — user/document หลอก agent + agent เผลอเปิดเผยข้อมูล sensitive
+12. **Schema drift / Incompatible backup** (ดูรายละเอียดในหมวด Schema Migration) — DB เก่า restore ไม่ได้ใน code ใหม่
+13. **MCP server availability** (ดูรายละเอียดในหมวด MCP Integration) — 3rd party MCP server หยุดดูแล → tool ที่ผูกอยู่หาย
 
 ---
 
@@ -838,6 +877,614 @@ gang notify mute --event <name> --duration 1h   # silence ชั่วครา�
 
 ### แนะนำสำหรับโปรเจกต์นี้
 Phase 4 (ใหม่) — implement 4 ช่องพร้อมกัน (Telegram, Discord, Line, Email) + routing engine + hot reload เพราะส่วนกลาง (registry/router/dispatcher) เป็นของ shared — ทำครั้งเดียวรองรับทุกช่อง
+
+---
+
+## 🔌 MCP (Model Context Protocol) Integration (รายละเอียด)
+
+### ปัญหา
+Tool ecosystem แตกเป็นเสี่ยง — Anthropic format, OpenAI format, Gemini format, custom tools — ต้องเขียน adapter ทุกครั้งที่เพิ่ม tool
+
+**MCP** (Model Context Protocol) คือ open standard ที่ Anthropic + ชุมชนผลักดัน เพื่อให้ tool/resource/prompt เชื่อมกับ AI agent ได้แบบ universal — ถ้า support = ใช้ MCP server ที่คนอื่นเขียนได้ฟรี (filesystem, GitHub, Slack, database, ...)
+
+### หลักการ
+- **MCP server** = ผู้ให้ tool (เขียนใน MCP protocol)
+- **MCP client** = agent ที่เรียกใช้ (gangAgent ทำหน้าที่นี้)
+- การเชื่อมผ่าน stdio / SSE / WebSocket
+- Tool schema มาตรฐาน → adapter เดียวพอ (แปลงเข้า provider-specific format ภายใน)
+
+### Integration กับ architecture เดิม
+
+```
+Skill (gangAgent)  ──▶  Tool binding
+                            ├─▶  built-in tool (Python function)
+                            └─▶  MCP tool (proxy ผ่าน MCP client)
+                                      ↓
+                                 MCP Server (stdio/SSE)
+                                      ↓
+                            ┌─────────┼──────────┐
+                            ↓         ↓          ↓
+                       filesystem  GitHub    Slack   ...
+                       (ของคนอื่น เขียน)
+```
+
+### Data model
+
+```python
+class MCPServer(BaseModel):
+    name: str
+    transport: Literal["stdio", "sse", "websocket"]
+    command: str | None = None         # stdio: shell command to spawn
+    args: list[str] = []
+    url: str | None = None             # sse/ws: endpoint
+    env: dict[str, str] = {}
+    enabled: bool = True
+
+class MCPTool(BaseModel):
+    server: str                        # which MCPServer provides this
+    name: str                          # tool name from MCP discovery
+    description: str
+    input_schema: dict                 # JSON schema
+```
+
+### File structure
+
+```
+src/gangagent/mcp/
+  client.py                  # MCP client wrapper (stdio + SSE)
+  registry.py                # discover tools from MCP servers
+  bridge.py                  # MCPTool ↔ tools/schema.py adapter
+src/gangagent/configs/
+  mcp_servers.yaml           # user-configured servers
+```
+
+### Config YAML
+
+```yaml
+# data/configs/mcp_servers.yaml
+servers:
+  filesystem:
+    transport: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "${ALLOWED_PATH}"]
+    enabled: true
+
+  github:
+    transport: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}
+    enabled: true
+
+  custom_sse:
+    transport: sse
+    url: https://my-mcp-server.example.com/sse
+    enabled: false
+```
+
+### CLI
+
+```
+gang mcp list                     # ดู MCP servers ที่ config + status
+gang mcp tools                    # ดู tool ทั้งหมดจาก servers ที่ enabled
+gang mcp test <server>            # spawn server + list tools (validate)
+gang mcp reload                   # reload config
+```
+
+### Best practices
+- **Reuse tool sandbox** — MCP tools ผ่าน sandbox/allowlist เดียวกับ built-in tools (`§Security`)
+- **Capability gate** — agent ที่ไม่มี `Capability.TOOL_USE` ไม่เห็น MCP tools (consistent กับ Capability Flag)
+- **Schema validation** — MCP tool schema ผ่าน Pydantic ก่อนเชื่อมเข้า provider format
+- **Lazy spawn** — stdio server spawn ตอนใช้จริง ไม่ใช่ตอน startup (ลด resource)
+- **Health monitoring** — server ตาย → emit `mcp.server_down` event ผ่าน Notification (Phase 4)
+- **Lock-in protection** — เก็บ list of tools used + อาจ migrate ไป built-in ถ้า MCP server หยุดดูแล
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 1 — implement พร้อม tool schema adapter (เพราะ MCP เป็นรูปแบบ tool หนึ่ง — ใช้ adapter เดียวกัน) ทำให้ Phase 3 Skill registry รับ MCP tools เข้ามาได้ทันที
+
+---
+
+## 📝 Prompt Library + Versioning (รายละเอียด)
+
+### ปัญหา
+plan ระบุ "reinforce personality ผ่าน system prompt ทุก call" — แต่ system prompt นั้น:
+- เก็บที่ไหน?
+- ใครแก้ได้?
+- เปลี่ยนแล้วย้อนกลับได้ไหม?
+- เปลี่ยนแล้วกระทบ agent ที่ใช้อยู่ยังไง?
+
+ถ้าไม่มี version control → **personality drift silently** = USP ของระบบพัง
+
+### หลักการ
+- **Prompts เป็น artifact** ไม่ใช่ string ที่ฝังในโค้ด
+- **Versioned + immutable** — เก็บทุก version, ไม่ overwrite
+- **Pinned per agent** — agent อ้าง prompt version ที่ตัวเองสร้างจาก (เหมือน `created_from_profession`)
+- **Composable** — system prompt = personality block + role block + skill block + memory block (template assemble)
+
+### Data model
+
+```python
+class PromptTemplate(BaseModel):
+    name: str                          # "personality_reinforcement"
+    version: str                       # "1.2"
+    template: str                      # Jinja2 syntax
+    variables: list[str]               # ["name", "traits", "role"]
+    description: str
+    created_at: datetime
+    parent_version: str | None         # version ที่ fork มา
+
+class AgentPromptBinding(BaseModel):
+    agent_id: str
+    block: Literal["personality", "role", "skill", "memory"]
+    template_name: str
+    template_version: str              # pin ไว้ — upgrade ต้อง explicit
+```
+
+### Storage layout
+
+```
+./data/prompts/
+  personality_reinforcement/
+    v1.0.j2
+    v1.1.j2
+    v1.2.j2
+    HEAD                              # current default version
+  role_block/
+    v1.0.j2
+  skill_block/
+    v1.0.j2
+  memory_block/
+    v1.0.j2
+```
+
+(ใช้ filesystem-based versioning + git-friendly — ไม่ใช่ DB เพื่อให้ diff ได้ง่าย)
+
+### Assembly flow
+
+```python
+def build_system_prompt(agent: Agent) -> str:
+    return "\n\n".join([
+        prompt_lib.render("personality_reinforcement", agent.prompt_bindings["personality"],
+                          name=agent.name, traits=agent.traits),
+        prompt_lib.render("role_block", agent.prompt_bindings["role"],
+                          role=agent.role),
+        prompt_lib.render("skill_block", agent.prompt_bindings["skill"],
+                          skills=agent.skills),
+        prompt_lib.render("memory_block", agent.prompt_bindings["memory"],
+                          relevant_facts=agent.memory.retrieve(k=5)),
+    ])
+```
+
+### CLI
+
+```
+gang prompts list                              # ดู template ทั้งหมด
+gang prompts show <name> [--version <v>]       # ดูเนื้อหา
+gang prompts diff <name> <v1> <v2>             # diff version
+gang prompts new <name> --from <version>       # fork version
+gang prompts set-head <name> <version>         # ตั้ง default
+gang prompts pin <agent-id> <block> <name> <version>   # bind ให้ agent
+```
+
+### Best practices
+- **Immutable** — เคย create version แล้วลบไม่ได้ (กัน agent ที่อ้างอยู่พัง)
+- **Semantic versioning** — bump version เมื่อ semantic เปลี่ยน
+- **Test-attached** — แต่ละ version มี evaluation test (consistency check ตาม §9 Evaluation)
+- **Audit trail** — ใครเปลี่ยน HEAD เมื่อไหร่
+- **Cap on history** — soft cap ที่ 50 versions per template (warn ถ้าเกิน — บ่งบอกว่าออกแบบไม่ดี)
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 2 — ทำพร้อม Personality Engine เพราะ personality block เป็น prompt template หลัก. ถ้าไม่ทำตอนนี้ → ฝัง prompt ในโค้ด → ย้อนกลับยาก
+
+---
+
+## 📚 RAG (Retrieval-Augmented Generation) Pipeline (รายละเอียด)
+
+### ปัญหา
+Memory System (§6) เก็บ "สิ่งที่คุยกับ agent" — แต่ใน workflow จริงผู้ใช้อยาก feed **knowledge base** ภายนอกให้ agent อ้างอิง:
+- PDF เอกสาร
+- Web pages
+- Code repository
+- Markdown notes
+
+ไม่มี ingest pipeline = agent ไม่รู้เรื่องนอกบทสนทนา
+
+### หลักการ
+- **แยก Memory กับ Knowledge** — Memory = ของ agent ตัวนั้น, Knowledge = collection ที่หลาย agents อ่านได้
+- **Pipeline เป็น stages** — ingest → parse → chunk → embed → store → retrieve → rerank
+- **Per-collection** — แต่ละ knowledge base เป็น collection แยก (agent เลือก attach ทีละ collection)
+
+### Stages
+
+```
+File / URL ──▶ Loader ──▶ Parser ──▶ Chunker ──▶ Embedder ──▶ Vector Store
+                                                                    │
+                                                                    ↓
+                                                              Retriever ──▶ Reranker ──▶ Context
+                                                                                              │
+                                                              build_system_prompt(..., context) 
+```
+
+### Data model
+
+```python
+class Collection(BaseModel):
+    name: str
+    description: str
+    embedding_model: str               # "text-embedding-3-small" / sentence-transformers/...
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+
+class Document(BaseModel):
+    id: str
+    collection: str
+    source: str                        # URI / path
+    content_hash: str                  # ตรวจ duplicate
+    metadata: dict                     # author, date, tags
+
+class Chunk(BaseModel):
+    document_id: str
+    index: int
+    text: str
+    embedding: list[float]
+    metadata: dict
+```
+
+### File structure
+
+```
+src/gangagent/rag/
+  loaders/                   # PDF, URL, code repo, markdown — plug-in
+    pdf.py
+    web.py
+    git_repo.py
+    markdown.py
+  chunkers/                  # sentence, paragraph, semantic
+  embedders/                 # OpenAI, sentence-transformers, ...
+  retrievers/                # similarity, MMR, hybrid (vector + BM25)
+  rerankers/                 # cohere, cross-encoder, LLM-based
+  pipeline.py                # orchestrate stages
+```
+
+### CLI
+
+```
+gang rag collections list
+gang rag collections create <name> [--embed-model <m>]
+gang rag ingest <collection> <path-or-url>          # ingest file/dir/URL
+gang rag attach <agent-id> <collection>             # ให้ agent เข้าถึง
+gang rag search <collection> "<query>" [-k 5]
+gang rag stats <collection>                         # document/chunk count, size
+gang rag reindex <collection>                       # re-embed ทั้ง collection
+```
+
+### Best practices
+- **Content-hash dedup** — ingest ไฟล์ซ้ำ = skip
+- **Incremental update** — เปลี่ยนแค่ chunk ที่ differ (ไม่ re-embed ทั้งไฟล์)
+- **Hybrid retrieval** — vector + BM25 combined (vector แม่นกับ semantic, BM25 แม่นกับ keyword)
+- **Citation** — chunk ส่งกลับพร้อม `source` → system prompt บังคับ agent ให้อ้างอิง → ลด hallucination
+- **PII scrub before embed** — sensitive doc ผ่าน Presidio (§Privacy) ก่อน
+- **Per-agent ACL** — collection มี allowlist agent (memory isolation)
+- **Reembed alert** — ถ้า embedding model upgrade → flag collection ที่ต้อง reindex
+- **Cost guard** — ingest ใหญ่ๆ pre-estimate cost (embedding API charge ตาม tokens)
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 3 — extend Memory System (vector DB มีอยู่แล้ว) ด้วย ingest pipeline + retriever + reranker เริ่มด้วย 2 loaders (markdown + PDF) แล้วขยาย
+
+---
+
+## ⏰ Scheduled Tasks (รายละเอียด)
+
+### ปัญหา
+Agent reactive ตอบเมื่อ user ถาม — แต่ผู้ใช้อยาก "ทุกเช้าสรุปข่าว", "ทุก 1 ชม. เช็ค inbox", "ก่อน meeting 15 นาที ทบทวน agenda"
+
+ไม่มี scheduler = ต้องเปิด terminal สั่งเอง ขาด proactive value
+
+### หลักการ
+- **Scheduler แยกจาก agent core** — agent ไม่รู้ตัวว่าถูก trigger จาก schedule หรือ user
+- **Task = (trigger, agent, prompt, output_channel)** — declarative
+- **ใช้ Notification system (Phase 4)** เป็น output channel — task เสร็จ → ส่ง Telegram/Discord/...
+- **Local-first** — ใช้ APScheduler / cron / launchd (ไม่ต้องมี server)
+
+### Data model
+
+```python
+class Trigger(BaseModel):
+    type: Literal["cron", "interval", "one_shot", "event"]
+    cron: str | None = None            # "0 7 * * *" = 7:00 ทุกวัน
+    interval_seconds: int | None = None
+    run_at: datetime | None = None
+    event_pattern: str | None = None   # subscribe event เช่น "backup.complete"
+
+class ScheduledTask(BaseModel):
+    id: str
+    name: str
+    trigger: Trigger
+    agent_id: str
+    prompt_template: str               # อ้าง prompt library
+    prompt_vars: dict = {}
+    output_channels: list[str] = []    # ['my_telegram'] — notifier channel ids
+    enabled: bool = True
+    max_runtime_seconds: int = 300
+    retry_on_failure: bool = True
+    timezone: str = "Asia/Bangkok"
+```
+
+### Config YAML
+
+```yaml
+# data/configs/scheduled_tasks.yaml
+tasks:
+  morning_news_summary:
+    trigger: { type: cron, cron: "0 7 * * *" }
+    agent_id: "agent_news_analyst"
+    prompt_template: "summarize_top_news"
+    prompt_vars: { sources: ["bbc", "reuters"], top_n: 5 }
+    output_channels: [my_telegram]
+    timezone: Asia/Bangkok
+
+  hourly_inbox_check:
+    trigger: { type: interval, interval_seconds: 3600 }
+    agent_id: "agent_email_assistant"
+    prompt_template: "check_inbox"
+    output_channels: [my_telegram]
+    enabled: true
+
+  on_backup_failure:
+    trigger: { type: event, event_pattern: "backup.failed" }
+    agent_id: "agent_ops"
+    prompt_template: "diagnose_backup_failure"
+    output_channels: [my_telegram, ops_email]
+```
+
+### File structure
+
+```
+src/gangagent/scheduler/
+  base.py                    # Trigger + ScheduledTask models
+  engine.py                  # APScheduler wrapper + event listener
+  runner.py                  # execute task = chat + collect + dispatch to channels
+```
+
+### CLI
+
+```
+gang schedule list
+gang schedule add <task.yaml> | --inline ...
+gang schedule disable <id>
+gang schedule run <id>                # manual trigger
+gang schedule history [--id x]        # past runs + outcome
+gang schedule next                    # next 10 runs
+```
+
+### Best practices
+- **Idempotent task design** — task ที่ retry ต้อง safe (ไม่ส่ง email ซ้ำ)
+- **Run budget per task** — max_runtime_seconds + max_cost_per_run
+- **Skip on overlap** — ถ้า run ก่อนหน้ายังไม่จบ → skip ไม่ใช่ queue (กัน pile-up)
+- **Timezone explicit** — กัน DST / cross-region bug
+- **Missed-run policy** — เครื่องปิด 1 วัน → run ทันที ตอนเปิด หรือ skip? config ได้
+- **Event-driven tasks** ใช้ pub/sub bus เดียวกับ Notification (เพิ่มความ consistency)
+- **Audit log** — runs ทั้งหมดเข้า `./data/sqlite/audit.db` (เหมือน notification)
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 4 — ทำต่อท้าย Notification system (ใช้ output_channels จากที่เพิ่งสร้าง) — เพิ่ม APScheduler + event bridge ครึ่งวันก็จบ
+
+---
+
+## 🛡️ Guardrails / Safety Filter (รายละเอียด)
+
+### ปัญหา
+ก่อน open source / multi-user — ต้องป้องกัน:
+- **Prompt injection** — user/document หลอกให้ agent ทำสิ่งที่ผู้ออกแบบไม่ต้องการ ("ignore previous instructions...")
+- **PII leak ในคำตอบ** — agent เผลอตอบข้อมูลส่วนตัวที่อยู่ใน memory
+- **NSFW / Toxic output** — agent ถูกหลอกให้สร้าง content ไม่เหมาะสม
+- **Sensitive topic** — บริษัทอาจห้าม agent ตอบเรื่อง legal/medical
+- **Data exfiltration via tool** — prompt injection → agent ใช้ tool ส่งข้อมูลออก (covered บางส่วนใน Security)
+
+### หลักการ
+- **Defense in depth** — หลายชั้น (input → output → tool call)
+- **Configurable per agent** — agent สำหรับงาน sensitive ใช้ stricter guardrails
+- **Fail-safe defaults** — ถ้า guard service ล่ม → block (ไม่ใช่ allow)
+
+### Layers
+
+```
+User input ──▶ Input Guard ──▶ Agent ──▶ Output Guard ──▶ Response
+                  │                          │
+                  ↓                          ↓
+          - prompt injection            - PII detection (Presidio)
+          - profanity detect            - NSFW classifier
+          - jailbreak pattern           - toxicity score
+          - topic gate                  - citation enforcement (RAG)
+          - PII redact                  - secret leak detect
+          - char/token limit            - format validator (JSON mode)
+                                              │
+                                              ↓
+                                        Tool Call Guard
+                                              │
+                                              ↓
+                                  - allowlist (§Security)
+                                  - schema validation
+                                  - HITL for destructive ops
+                                  - rate limit per tool
+```
+
+### Data model
+
+```python
+class GuardrailPolicy(BaseModel):
+    name: str
+    input_filters: list[FilterConfig]
+    output_filters: list[FilterConfig]
+    tool_filters: list[FilterConfig]
+    on_violation: Literal["block", "redact", "warn", "log_only"]
+    notify_severity: Severity = Severity.WARN
+
+class FilterConfig(BaseModel):
+    type: str                          # "prompt_injection", "pii", "nsfw", "topic_gate"
+    enabled: bool = True
+    threshold: float | None = None     # ML-based filter
+    allow_patterns: list[str] = []
+    deny_patterns: list[str] = []
+```
+
+### Config YAML
+
+```yaml
+# data/configs/guardrails.yaml
+policies:
+  default:
+    input_filters:
+      - { type: prompt_injection, threshold: 0.7 }
+      - { type: char_limit, max: 10000 }
+    output_filters:
+      - { type: pii, on_match: redact }
+      - { type: secret_leak }
+    tool_filters:
+      - { type: allowlist, allowed: [search, calc, file_read] }
+    on_violation: block
+    notify_severity: WARN
+
+  medical_agent:                       # stricter
+    input_filters:
+      - { type: prompt_injection, threshold: 0.5 }
+      - { type: topic_gate, allowed_topics: [symptoms, prevention] }
+    output_filters:
+      - { type: pii, on_match: block }
+      - { type: medical_disclaimer_required: true }
+    on_violation: block
+
+agent_bindings:
+  agent_default: default
+  agent_doc_dr: medical_agent
+```
+
+### Implementations
+- **prompt_injection**: Rebuff / LakeraAI patterns / fine-tuned BERT classifier
+- **PII**: Microsoft Presidio (open source) — regex + NER
+- **NSFW/Toxic**: Perspective API / open source classifier
+- **Secret leak**: regex + entropy-based (gitleaks patterns)
+- **Topic gate**: zero-shot classifier (e.g., `facebook/bart-large-mnli`)
+
+### CLI
+
+```
+gang guardrails list
+gang guardrails test --policy default --input "ignore prev instructions..."
+gang guardrails test --policy default --output "user's email is x@y.com..."
+gang guardrails violations [--agent x] [--since 1d]    # ดู log
+```
+
+### Best practices
+- **Layered, not single** — ไม่หวัง 1 filter ครอบทุก attack
+- **Log all violations** even if allowed (`log_only` mode) — สำหรับ tuning threshold
+- **A/B threshold** — ทดสอบ false positive vs false negative rate
+- **Notify CRITICAL** — repeated violation จาก same source = potentially adversarial → emit event
+- **Bypass for admin** — explicit override (audit log บันทึก)
+- **Performance budget** — guard latency ≤ 100ms ต่อ call ไม่ให้ block UX
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 6 (ก่อน UI public) — ตอนเตรียม "ทีม → product" — implement basic 3 layers (input/output/tool) + 2-3 filter types แรก (prompt_injection, PII, secret_leak) → ขยายตามเหตุการณ์จริงที่เจอ
+
+---
+
+## 🗂️ Schema Migration (รายละเอียด)
+
+### ปัญหา
+SQLite schema เปลี่ยนระหว่าง phases — เพิ่ม table, แก้ column type, rename — ถ้าไม่มี migration system:
+- DB เก่า restore ไม่ได้ใน code ใหม่
+- Backup กลับมาเปิดไม่ออก
+- ไม่รู้ว่า schema version ตรงกับ code version ไหน
+
+ต้องการ Alembic-like แต่ light — ไม่ over-engineer สำหรับ project ขนาดนี้
+
+### หลักการ
+- **Forward + backward migration** — `up()` + `down()` ทุกอัน
+- **Versioned + linear** — เลข version monotonic (ไม่ใช้ hash chain ซับซ้อน)
+- **Auto-detect drift** — startup ตรวจว่า DB schema ตรงกับ code expectation
+- **Bundled with backup** — migration script aligned กับ `backup_manifest.json.schema_version`
+
+### Data model
+
+```python
+class Migration(BaseModel):
+    version: str                       # "0003"
+    name: str                          # "add_profession_label_to_agent"
+    up_sql: str
+    down_sql: str
+    created_at: datetime
+    applied_at: datetime | None = None
+```
+
+### File structure
+
+```
+src/gangagent/migrations/
+  __init__.py
+  runner.py                  # apply/rollback migrations
+  0001_initial.sql
+  0002_add_memory_tables.sql
+  0003_add_profession_label.sql
+  ...
+```
+
+(ใช้ raw SQL ไฟล์ — Pydantic อ่าน metadata จาก comment header)
+
+```sql
+-- name: add_profession_label_to_agent
+-- version: 0003
+
+-- up
+ALTER TABLE agents ADD COLUMN created_from_profession TEXT;
+
+-- down
+ALTER TABLE agents DROP COLUMN created_from_profession;
+```
+
+### CLI
+
+```
+gang db status                        # current schema version + pending migrations
+gang db migrate                       # apply all pending up
+gang db rollback [--to <version>]     # rollback
+gang db migrate --dry-run             # preview SQL
+gang db new <name>                    # scaffold migration file
+```
+
+### Best practices
+- **Run migration in transaction** — atomic, partial failure = rollback
+- **Test up + down** in CI — ทุก migration ต้อง round-trip ได้
+- **Backup before migrate** — auto trigger `gang backup snapshot --tag pre-migration-<v>` (§Backup integration)
+- **Schema version ใน manifest** — restore backup เก่า → detect schema_version → run missing migrations
+- **No data migration in DDL files** — data transform เขียน Python migration แยก (อ่าน + แปลง + เขียน)
+- **Lock during migrate** — กัน user สั่งงานระหว่าง migration
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 1 — วาง foundation ตั้งแต่ก่อนเริ่มเก็บข้อมูลถาวร ทำง่ายๆ (linear version + raw SQL) ไม่ต้อง Alembic เต็มตัว ขยายภายหลังถ้าจำเป็น
+
+---
+
+## 🔮 Future Considerations (deferred)
+
+Features ที่ออกแบบไว้ใน plan แต่ยังไม่ schedule — ตัดสินใจเพิ่มภายหลังเมื่อมีความต้องการชัด:
+
+| Feature | กลุ่ม | ทำไมเลื่อน |
+|---|---|---|
+| **Hallucination / Grounding score** | Safety | RAG citation ครอบคลุมส่วนใหญ่แล้ว — explicit score detector ค่อยทำเมื่อใช้งานจริงเจอปัญหา |
+| **Reasoning trace (CoT capture)** | Observability | thinking_mode capability พอใช้ — explicit trace store ทำเมื่อ debug multi-agent ยาก |
+| **Conversation Replay (VCR)** | Dev tooling | vcr.py ใน stack แล้ว — formalize เป็น `gang replay <session>` หลัง Phase 5 |
+| **A/B / Shadow Mode** | Quality | สำคัญตอนเปลี่ยน model จริง — Phase 7 หรือเมื่อ user base ใหญ่ |
+| **Voice I/O (STT/TTS)** | UX | ขนาดงานใหญ่ ขึ้นกับ provider audio capability — รอ requirement ชัด |
+| **File ingest UI (drag/drop)** | UX | RAG CLI ครอบคลุมแล้ว — UI ค่อยทำใน Phase 7 |
+| **Session export (md/PDF)** | UX | ง่าย ทำตอน Phase 7 พร้อม UI |
+| **Plugin SDK formal contract** | Community | pattern มี (providers/notifiers/professions) — formalize เมื่อมี 3rd party จริง |
+| **Telemetry opt-in** | OSS | ต้องผ่าน privacy review — เก็บไว้ตอน open source |
+| **Workspace / Multi-tenancy** | Product | ตอนเปลี่ยนจาก single-user → team |
+| **Auth + RBAC** | Product | พร้อม Workspace |
+| **Per-agent quota / budget cap** | Cost | budget cap global มีอยู่แล้ว — per-agent ตอนหลายคนใช้ |
+
+→ เก็บไว้ใน plan เป็น "พิจารณา" — ไม่ใช่ "จะทำ" — กัน scope creep แต่ไม่ลืม
 
 ---
 
