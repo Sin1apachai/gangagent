@@ -99,7 +99,8 @@
 | `Spawning` | กำลังกำเนิด — assign ID, init memory |
 | `Naming` | รอผู้ใช้ตั้งชื่อ |
 | `Forming` | Personality Engine สร้างนิสัยจากชื่อ |
-| `Training` | รับ role/skill จากผู้ใช้ |
+| `Profession?` *(optional)* | ผู้ใช้เลือก Profession Template หรือ skip → preset apply ลง role/skills/trait-bias (ดู §Profession Template) |
+| `Training` | รับ role/skill จากผู้ใช้ (override preset ได้) |
 | `Active` | พร้อมทำงาน |
 | `Sleeping` | พักไว้ ไม่กิน resource แต่ memory ยังอยู่ |
 | `Retired` | ลบทิ้ง (มี soft-delete + archive) |
@@ -130,6 +131,7 @@
 
 - **Role** = บทบาทหลัก (เช่น "ผู้ช่วยเขียนโปรแกรม", "นักวิเคราะห์ข้อมูล")
 - **Skill** = ความสามารถเฉพาะ (เช่น Python, SQL, การตลาด)
+- **Profession Template** *(optional preset)* — packaged bundle ที่ pre-fill role + default skills + trait bias + provider hint ตอนสร้าง agent — **ไม่ใช่ field ถาวร**, สลายตัวหลัง apply (ดู §Profession Template)
 - **Tool binding** — แต่ละ skill ผูกกับ tool จริง (search, code exec, calculator)
 - **Skill registry** — global pool ที่ agent หยิบมาใช้ได้
 - **Versioning** — แก้ role/skill แล้วย้อนกลับได้ (เหมือน git)
@@ -188,11 +190,17 @@
 - Trait override
 - Persistence (เก็บ agent ไว้ใช้รอบหน้า)
 
-### Phase 3 — Role/Skill + Memory + Backup (สัปดาห์ 7-8)
+### Phase 3 — Role/Skill + Memory + Backup + Profession (สัปดาห์ 7-8)
 - Skill registry + tool binding
 - Role/Skill assignment flow
 - Memory system (short + long + structured) — เขียนลง `./data/`
 - Versioning ของ role/skill
+- **Profession Template** (ดู §Profession Template):
+  - `Profession` model + `ProfessionRegistry` (plug-in YAML)
+  - `apply()` factory — one-time, sliding-out reference
+  - 5-6 builtin: software_engineer, data_analyst, writer, teacher, researcher, project_manager
+  - CLI: `gang professions {list,show}`, `gang spawn --profession <name>`
+  - Snapshot version pin (`<name>@v<ver>`)
 - **Backup system** (restic integration):
   - `./data/` layout + `.backupignore`
   - CLI: `gang backup {snapshot,list,restore,verify,export,import,prune,status}`
@@ -452,6 +460,144 @@ gang backup status                      # snapshot ล่าสุด + ขน�
 - **Audit log + immutable repo** → Phase 5 พร้อม observability
 - **Crypto-shredding** สำหรับ right-to-be-forgotten → Phase 3 พร้อม memory deletion
 - **Cost / size monitoring** + alert → Phase 5
+
+---
+
+## 👔 Profession Template (รายละเอียด)
+
+### ปัญหา
+ทุกครั้งที่สร้าง agent ใหม่ ผู้ใช้ต้อง config role + skills + tone + provider เองตั้งแต่ศูนย์ → friction สูง + agent ออกมาคุณภาพไม่สม่ำเสมอ
+
+อยากได้ "preset 1-คลิก" สำหรับอาชีพยอดนิยม (engineer, analyst, writer, teacher, ...) — แต่ **ห้าม**ทำให้ทับซ้อนกับ Role/Skill/Personality ที่มีอยู่
+
+### หลักการ 1 ประโยค
+> **Profession เป็น recipe, Agent คือเค้กที่อบเสร็จแล้ว** — recipe ทำงานครั้งเดียวตอนอบ จากนั้นแก้เค้กที่ตัวเค้ก ไม่ใช่ที่ recipe
+
+แปลว่า: Profession Template เป็น **factory ที่สลายตัวหลัง apply** ไม่ใช่ **field ถาวรบน Agent**
+
+### 6 กฎที่กัน overlap
+
+| # | กฎ | ทำไม |
+|---|---|---|
+| 1 | **One-time application** — apply ครั้งเดียวตอน `create_agent()` ไม่มี API ให้ reapply | กัน profession overwrite สิ่งที่ user แก้แล้ว |
+| 2 | **Source of truth ชัดเจน** — runtime อ่านจาก `Agent.role/skills/traits` เท่านั้น ห้าม import profession module ตอน chat | บังคับวินัยที่ระดับ architecture |
+| 3 | **Trait deltas ไม่ใช่ replacements** — bias บนค่าจาก Personality Engine, clamp [0,1] | "ชื่อ → นิสัย" ยังเป็น USP, profession แค่ปรับน้ำหนัก |
+| 4 | **`created_from_profession` เป็น label เท่านั้น** — read-only, ใช้สำหรับ analytics/grouping ห้าม drive behavior | ตอบ "show me all engineers" ได้ โดยไม่กระทบพฤติกรรม |
+| 5 | **Suggestions, not enforcements** — `suggested_provider/model` แค่ hint, user ปฏิเสธได้ | ผู้ใช้ยัง autonomous |
+| 6 | **Snapshot at apply time (version pin)** — เก็บเป็น `software_engineer@v1.2` | profession YAML เปลี่ยน → agents เก่าไม่กระทบ |
+
+### Data model
+
+```python
+class Profession(BaseModel):
+    name: str                              # "software_engineer"
+    version: str                           # "1.2"
+    display_name: str
+    role_template: str                     # default ให้ Agent.role
+    default_skills: list[str]              # reference Skill registry
+    trait_deltas: dict[TraitName, float]   # bias, -1.0 to +1.0
+    suggested_provider: str | None         # HINT only
+    suggested_model: str | None            # HINT only
+    tool_allowlist: list[str]              # union กับ Skill tools
+
+# Agent: ของเดิมไม่เพิ่ม field พฤติกรรม ยกเว้น label เดียว
+class Agent(BaseModel):
+    # ... ของเดิมทั้งหมด ...
+    created_from_profession: str | None = None   # "software_engineer@v1.2" — label
+```
+
+→ **0 field overlap** บน Agent. Profession เป็น registry/file อีกชั้นที่ Agent ไม่ depend ตอน runtime
+
+### Apply flow (factory pattern)
+
+```python
+def create_agent(name: str, profession: str | None = None) -> Agent:
+    base_traits = personality_engine.from_name(name)   # ชื่อ → traits (USP)
+
+    if profession is None:
+        return Agent(name=name, traits=base_traits, role="", skills=[])
+
+    prof = ProfessionRegistry.get(profession)
+    return Agent(
+        name=name,
+        traits=clamp(base_traits + prof.trait_deltas, 0, 1),  # bias เท่านั้น
+        role=prof.role_template,                              # default — user แก้ได้
+        skills=list(prof.default_skills),                     # default — เพิ่ม/ลบได้
+        tool_allowlist=list(prof.tool_allowlist),
+        preferred_provider=prof.suggested_provider,            # hint
+        preferred_model=prof.suggested_model,                  # hint
+        created_from_profession=f"{prof.name}@v{prof.version}", # label
+    )
+```
+
+หลัง `create_agent()` profession reference หายไปจาก behavior — เหลือแค่ label
+
+### Lifecycle integration
+
+```
+Spawning → Naming → Personality emerges (ชื่อ → traits)
+        → [Profession?] OPTIONAL — reveal preset card, ผู้ใช้เลือก/skip
+              ├─ เลือก: apply preset → role/skills/trait bias ถูก pre-fill
+              └─ skip: blank slate (flow เดิม backward compatible)
+        → Training (user override อะไรก็ได้ — preset แค่จุดเริ่ม)
+        → Active
+```
+
+### Plug-in pattern (เหมือน providers)
+
+```
+src/gangagent/professions/
+  base.py                    # Profession model + ProfessionRegistry
+  apply.py                   # apply(name, profession_name) -> AgentInitArgs
+  builtin/
+    software_engineer.yaml
+    data_analyst.yaml
+    teacher.yaml
+    writer.yaml
+    researcher.yaml
+    project_manager.yaml
+  user/                      # user-created professions (gitignored)
+```
+
+→ เพิ่ม profession ใหม่ = drop YAML file (ไม่ต้องแก้โค้ด — เหมือนเพิ่ม provider)
+
+### ตัวอย่าง YAML
+
+```yaml
+# professions/builtin/software_engineer.yaml
+name: software_engineer
+version: "1.0"
+display_name: "วิศวกรซอฟต์แวร์"
+role_template: |
+  ช่วยออกแบบ/เขียน/รีวิวโค้ด อธิบายเป็นขั้นเป็นตอน
+  ให้ตัวอย่างที่รันได้จริง ระบุ trade-off เมื่อมีหลายวิธี
+default_skills: [python, git, debugging, system_design, testing]
+trait_deltas:
+  conscientiousness: +0.3
+  verbosity: -0.1
+  formality: 0.0
+suggested_provider: claude
+suggested_model: claude-sonnet-4-6
+tool_allowlist: [code_exec, web_search, file_read, file_write]
+```
+
+### 3 anti-patterns ที่ห้ามทำเด็ดขาด
+
+1. ❌ เพิ่ม `agent.profession` field ที่อ่านตอน runtime → **ทับ Role ทันที**
+2. ❌ มี `profession.refresh(agent)` หรือ `profession.reapply()` API → **ทำลายการแก้ของ user**
+3. ❌ ใช้ profession ใน system prompt builder โดยตรง → **ต้องอ่านจาก `agent.role` เท่านั้น**
+
+### CLI commands (จะ implement)
+
+```
+gang professions list                    # ดู template ที่มี
+gang professions show <name>             # ดูรายละเอียด preset
+gang spawn --profession software_engineer --name "มานี"
+gang spawn --name "มานี"                 # ไม่ใช้ profession (flow เดิม)
+```
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 3 — implement พร้อม Skill registry (เพราะ `default_skills` ต้อง reference registry ที่มีอยู่จริงก่อน) เริ่มด้วย builtin 5-6 professions ที่ครอบคลุม use case ทั่วไป → ขยายเป็น user-defined ภายหลัง
 
 ---
 
