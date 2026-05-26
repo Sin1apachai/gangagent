@@ -210,18 +210,32 @@
   - Weekly restore drill (automated verify)
   - `docs/RECOVERY.md` runbook
 
-### Phase 4 — Inter-Agent + Orchestration (สัปดาห์ 9-10)
+### Phase 4 — Notification System (สัปดาห์ 9)
+*(ดูรายละเอียดใน §Notification System)*
+- `INotifier` Protocol + `NotifierRegistry` (plug-in)
+- Implementations: Telegram, Discord, Line, Email (พร้อมกัน 4 ช่อง)
+- Config YAML (`data/configs/notifications.yaml`) + `${ENV_VAR}` interpolation
+- Routing engine — match by severity / event / tag
+- Dispatcher — async fire-and-forget + retry (exp backoff) + per-channel rate limit + dedupe window
+- Audit log → `./data/sqlite/audit.db`
+- Hot reload (file watcher) + dry-run mode + healthcheck
+- CLI: `gang notify {list,test,dry-run,send,history,reload,mute}`
+- Event emitters ฝัง: backup events, watcher events (mediator events รอ Phase 5)
+
+### Phase 5 — Inter-Agent + Orchestration (สัปดาห์ 10-11)
 - Message bus
 - Delegation + Review pattern
 - Multi-agent workflow engine
+- **Mediator Agent** integrate กับ Phase 4 notifier (loop_detected → WARN, loop_unresolved → CRITICAL)
 
-### Phase 5 — Observability + Eval (สัปดาห์ 11-12)
+### Phase 6 — Observability + Eval (สัปดาห์ 12-13)
 - Cost/token tracking dashboard
-- Audit log
+- Audit log expansion (รวม notification audit ที่มีอยู่)
 - Skill benchmark suite
 - Personality consistency test
+- Watcher Agent (provider changelog) — emit via Phase 4 notifier
 
-### Phase 6 — UI + Polish (สัปดาห์ 13+)
+### Phase 7 — UI + Polish (สัปดาห์ 14+)
 - เลือก interface: CLI ก่อน → Web UI ภายหลัง
 - Documentation
 - Example agents (template)
@@ -241,6 +255,7 @@
 | **Testing** | pytest + vcr.py (record API calls) |
 | **Observability** | OpenTelemetry + simple dashboard |
 | **Backup** | restic (encrypted, dedup, GFS retention) |
+| **Notification** | `httpx` (Telegram/Discord/Line REST), `aiosmtplib` (email), `watchfiles` (hot reload) |
 
 ---
 
@@ -271,6 +286,7 @@
 6. **Vendor lock-in ของ feature เฉพาะ** (ดูรายละเอียดในหมวด Vendor Lock-in ด้านล่าง)
 7. **Capability flag → if-else เยอะ** (ดูรายละเอียดในหมวด Design Patterns ด้านล่าง)
 8. **Data loss / Disaster recovery** (ดูรายละเอียดในหมวด Backup & Recovery ด้านล่าง)
+9. **Missed alerts / Alert fatigue** (ดูรายละเอียดในหมวด Notification System ด้านล่าง) — แจ้งเตือนพลาด CRITICAL หรือสแปมจนผู้ใช้ปิดทั้งหมด → ทั้งคู่ silent failure ที่อันตรายเท่ากัน
 
 ---
 
@@ -598,6 +614,230 @@ gang spawn --name "มานี"                 # ไม่ใช้ profession
 
 ### แนะนำสำหรับโปรเจกต์นี้
 Phase 3 — implement พร้อม Skill registry (เพราะ `default_skills` ต้อง reference registry ที่มีอยู่จริงก่อน) เริ่มด้วย builtin 5-6 professions ที่ครอบคลุม use case ทั่วไป → ขยายเป็น user-defined ภายหลัง
+
+---
+
+## 🔔 Notification System (รายละเอียด)
+
+### ปัญหา
+ระบบต้องแจ้งผู้ใช้เรื่องสำคัญ — Mediator ตัดวงสนทนาวน, Watcher เจอ provider API เปลี่ยน, Backup ล้มเหลว, Cost เกิน budget, restore drill fail — แต่ผู้ใช้ไม่นั่งดู terminal ทั้งวัน
+
+ต้องการ: ส่งผ่าน **Telegram / Discord / Line / Email** + ขยายช่องทางใหม่ได้, ตั้งค่าผ่าน config (ไม่แตะโค้ด), routing ตาม severity/event/tag
+
+### หลักการ
+- **Plug-in pattern** เหมือน `providers/` — Strategy + Registry + Adapter (รักษาความสม่ำเสมอใน codebase)
+- **Config-driven** — YAML เป็น source of truth, hot-reload ได้
+- **Async fire-and-forget** — notification ห้าม block agent execution
+- **Failover** — CRITICAL event ส่งหลายช่อง
+
+### Data model
+
+```python
+class Severity(StrEnum):
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+class NotificationMessage(BaseModel):
+    event: str                  # "backup.failed", "agent.loop_unresolved", ...
+    title: str
+    body: str
+    severity: Severity
+    tags: list[str] = []        # ["agent:มานี", "phase:training"]
+    metadata: dict = {}
+    timestamp: datetime
+
+class SendResult(BaseModel):
+    channel: str
+    success: bool
+    error: str | None = None
+    latency_ms: int
+
+class INotifier(Protocol):
+    name: str
+    config: NotifierConfig
+
+    async def send(self, msg: NotificationMessage) -> SendResult: ...
+    async def healthcheck(self) -> bool: ...
+    def format(self, msg: NotificationMessage) -> str: ...  # ปรับ format ต่อช่อง
+```
+
+### File structure (plug-in)
+
+```
+src/gangagent/notifiers/
+  base.py                    # INotifier + NotificationMessage + Severity
+  registry.py                # @register_notifier + discover
+  router.py                  # routing engine (event → channels)
+  dispatch.py                # async fire-and-forget + retry + dedupe
+  config.py                  # YAML loader + ${ENV_VAR} interpolation
+  implementations/
+    telegram.py              # @register_notifier("telegram")
+    discord.py
+    line.py
+    email.py
+    webhook.py               # generic — Slack/Teams/custom
+    console.py               # dev fallback
+```
+
+→ เพิ่มช่องใหม่ = drop file + decorator (เหมือน providers)
+
+### Config YAML
+
+```yaml
+# data/configs/notifications.yaml
+channels:
+  my_telegram:
+    type: telegram
+    bot_token: ${TELEGRAM_BOT_TOKEN}      # อ่านจาก .env
+    chat_id: "123456789"
+    parse_mode: HTML
+    enabled: true
+
+  team_discord:
+    type: discord
+    webhook_url: ${DISCORD_WEBHOOK_URL}
+    username: "gangAgent"
+    enabled: true
+
+  line_personal:
+    type: line
+    channel_access_token: ${LINE_TOKEN}
+    user_id: ${LINE_USER_ID}              # Messaging API
+    # หรือ
+    # notify_token: ${LINE_NOTIFY_TOKEN}  # Line Notify (deprecated 2025 แต่ยังใช้ได้)
+    enabled: true
+
+  ops_email:
+    type: email
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    use_tls: true
+    username: ${SMTP_USER}
+    password: ${SMTP_PASS}
+    from_addr: "gangagent@example.com"
+    to: [ops@example.com]
+    enabled: false                         # ปิดได้แบบไม่ลบ
+
+routes:
+  - match: { severity: CRITICAL }
+    channels: [my_telegram, ops_email]     # ส่งหลายช่อง (failover)
+
+  - match: { severity: ERROR }
+    channels: [my_telegram]
+
+  - match: { severity: WARN, tags: ["agent:*"] }
+    channels: [team_discord]
+
+  - match: { event: "backup.complete" }
+    channels: [team_discord]
+    rate_limit: { max: 1, per: 1h }        # กัน spam
+
+  - match: { event: "agent.spawn" }
+    channels: []                            # silenced
+
+defaults:
+  retry:
+    attempts: 3
+    backoff_seconds: [1, 5, 30]            # exponential
+  rate_limit:
+    max: 60
+    per: 1h                                 # per-channel
+  dedupe_window_seconds: 300                # 5 นาที — message ซ้ำ = ส่งครั้งเดียว
+  timeout_seconds: 10
+```
+
+### Routing engine
+
+```python
+async def dispatch(msg: NotificationMessage) -> list[SendResult]:
+    matched = router.match(msg)              # apply rules from YAML
+    if not matched:
+        return []
+
+    if dedupe.seen_recently(msg):            # 5-min dedupe window
+        return []
+
+    results = await asyncio.gather(*[
+        send_with_retry(notifier, msg)        # retry + backoff
+        for notifier in matched
+        if rate_limiter.allow(notifier)       # per-channel cap
+    ])
+    audit_log.write(msg, results)             # ./data/sqlite/audit.db
+    return results
+```
+
+### Events ที่ระบบจะ emit
+
+| Event | Severity | จาก | ใช้ช่องไหน (default) |
+|---|---|---|---|
+| `agent.spawned` | INFO | lifecycle | (silenced) |
+| `agent.loop_detected` | WARN | Mediator | Discord |
+| `agent.loop_unresolved` | CRITICAL | Mediator | Telegram + Email |
+| `provider.breaking_change` | WARN | Watcher | Telegram |
+| `provider.unavailable` | ERROR | provider call | Telegram |
+| `backup.complete` | INFO | backup scheduler | Discord (rate-limited) |
+| `backup.failed` | ERROR | backup scheduler | Telegram |
+| `backup.restore_drill_failed` | CRITICAL | weekly verify | Telegram + Email |
+| `cost.threshold_warning` | WARN | cost tracker | Telegram |
+| `cost.budget_exceeded` | CRITICAL | cost tracker | Telegram + Email |
+| `tool.destructive_pending` | INFO | tool sandbox | Telegram (HITL) |
+| `auth.failure` | ERROR | provider | Telegram |
+
+### Best practices ที่บังคับใช้
+
+| Practice | วิธี |
+|---|---|
+| **Retry + exponential backoff** | 3 attempts, delays [1s, 5s, 30s] — กัน flaky network |
+| **Per-channel rate limit** | Telegram global limit 30 msg/sec — กันโดน ban |
+| **Dedupe window** | event เดียวกัน fire ซ้ำใน 5 นาที = ส่งครั้งเดียว — กัน alert storm |
+| **Async fire-and-forget** | `asyncio.create_task()` ไม่ block core flow — agent ทำงานต่อได้แม้ notification ล้ม |
+| **Failover (multi-channel)** | CRITICAL ส่งหลายช่อง parallel — ช่องหนึ่งตาย ยังได้ครบ |
+| **Healthcheck command** | `gang notify test <channel>` — verify credential ก่อนใช้จริง |
+| **Hot reload config** | file watcher บน `notifications.yaml` — แก้แล้ว effect ทันที |
+| **Dry-run mode** | `gang notify dry-run --event backup.failed` — ดู match กับ rule ไหน ไม่ส่งจริง |
+| **PII-aware redaction** | respect `MemorySensitivity` (§Privacy) — strip secrets/PII จาก message ก่อนส่ง |
+| **Audit log** | ทุก notification log เข้า `./data/sqlite/audit.db` — debug + compliance |
+| **Severity escalation** | INFO ที่ retry หมดแล้วยังล้ม → bump เป็น WARN → CRITICAL (กัน silent failure) |
+| **Bootstrap-safe** | ถ้า YAML invalid → fallback เป็น `console` notifier (ไม่ crash) |
+| **Template/format ต่อช่อง** | Telegram: HTML, Discord: markdown + embed, Line: plain, Email: HTML + plain alternative |
+
+### CLI commands (จะ implement)
+
+```
+gang notify list                            # ดู channel ที่ config ไว้
+gang notify test <channel>                  # ส่ง test message
+gang notify dry-run --event <name>          # ดู match rule ไหน ไม่ส่งจริง
+gang notify send --severity WARN --title "..." --body "..."   # manual trigger
+gang notify history [--channel x]           # log ย้อนหลัง
+gang notify reload                          # force reload YAML
+gang notify mute --event <name> --duration 1h   # silence ชั่วคราว
+```
+
+### Lib choices (open source, lightweight)
+
+| ช่อง | Lib | ทำไม |
+|---|---|---|
+| Telegram | `httpx` ตรง Bot API | ไม่ต้อง wrapper หนัก, official REST API ง่าย |
+| Discord | `httpx` ตรง Webhook URL | webhook = single POST, ไม่ต้อง bot lib |
+| Line | `httpx` ตรง Messaging API | official REST API |
+| Email | `aiosmtplib` | async SMTP, รองรับ TLS/STARTTLS |
+| Config | `pydantic` + `pyyaml` (มีอยู่แล้ว) | reuse — type-safe |
+| File watcher | `watchfiles` | small, async-native, hot-reload |
+
+→ ไม่เพิ่ม heavy dependency
+
+### Anti-patterns ที่ห้ามทำ
+
+1. ❌ Sync `requests.post()` ใน hot path → block agent → latency spike
+2. ❌ Hard-code channel/token ในโค้ด → config-driven หาย
+3. ❌ ไม่มี rate limit → โดน provider ban → notification ไม่ทำงานเงียบๆ
+4. ❌ Notification logic ใน agent core → coupling — agent ต้อง emit event เท่านั้น dispatcher แยกอยู่
+5. ❌ Crash agent เมื่อ notification ล้ม → notification เป็น peripheral concern
+
+### แนะนำสำหรับโปรเจกต์นี้
+Phase 4 (ใหม่) — implement 4 ช่องพร้อมกัน (Telegram, Discord, Line, Email) + routing engine + hot reload เพราะส่วนกลาง (registry/router/dispatcher) เป็นของ shared — ทำครั้งเดียวรองรับทุกช่อง
 
 ---
 

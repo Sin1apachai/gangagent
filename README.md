@@ -64,10 +64,11 @@ cli/  ──▶  ProviderRegistry  ──▶  IAgentProvider (Protocol)
 | 0 | Project scaffold + Claude provider + CLI | ✅ |
 | 1 | OpenAI/Gemini + CapabilityRouter + Tool schema adapter | ⏳ |
 | 2 | Agent lifecycle + Personality Engine (ชื่อ → นิสัย) | ⏳ |
-| 3 | Skill/Role + Memory (short/long/structured) + **Backup (restic)** | ⏳ |
-| 4 | Inter-agent comm + Mediator system agent | ⏳ |
-| 5 | Observability + Eval + Watcher system agent | ⏳ |
-| 6 | UI polish (REST → Web) | ⏳ |
+| 3 | Skill/Role + Memory (short/long/structured) + **Backup (restic)** + **Profession Template** | ⏳ |
+| 4 | **Notification system** (Telegram / Discord / Line / Email + routing) | ⏳ |
+| 5 | Inter-agent comm + Mediator system agent | ⏳ |
+| 6 | Observability + Eval + Watcher system agent | ⏳ |
+| 7 | UI polish (REST → Web) | ⏳ |
 
 รายละเอียดแต่ละเฟส + risk/security/privacy → ดู `plan.md`
 
