@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+.DS_Store
+.idea/
+.vscode/
+uv.lock
+*.db
+*.sqlite
+data/
+logs/
+
+# Claude Code — keep skills, ignore personal overrides
+.claude/settings.local.json
