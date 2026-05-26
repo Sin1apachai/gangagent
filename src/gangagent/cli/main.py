@@ -72,5 +72,31 @@ def ask(
         raise typer.Exit(code=130) from None
 
 
+@app.command()
+def stream(
+    prompt: str = typer.Argument(..., help="Prompt to stream a response for"),
+    provider: str = typer.Option("claude", "--provider", "-p"),
+    model: str | None = typer.Option(None, "--model", "-m"),
+    system: str | None = typer.Option(None, "--system", "-s"),
+    max_tokens: int = typer.Option(1024, "--max-tokens"),
+) -> None:
+    """Stream a chat response token-by-token."""
+    prov, _ = _make_provider(provider, model)
+
+    async def run() -> None:
+        async for chunk in prov.stream(
+            [Message(role=Role.USER, content=prompt)],
+            system=system,
+            max_tokens=max_tokens,
+        ):
+            console.print(chunk, end="")
+        console.print()
+
+    try:
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        raise typer.Exit(code=130) from None
+
+
 if __name__ == "__main__":
     app()
