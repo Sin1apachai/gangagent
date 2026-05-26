@@ -141,6 +141,7 @@
 - **Structured memory**: key-value store สำหรับ fact ที่สอน
 - **Memory per agent** — แยกขาด ไม่ปนกัน
 - **Shared memory pool** (optional) — สำหรับ agent ที่ทำงานเป็นทีม
+- **State layout**: ทุก persistence อยู่ใน `./data/{sqlite,chroma,configs,logs}/` — backup tool เห็นจุดเดียว (ดู §Backup & Recovery)
 
 ### 7. Inter-Agent Communication
 
@@ -187,11 +188,19 @@
 - Trait override
 - Persistence (เก็บ agent ไว้ใช้รอบหน้า)
 
-### Phase 3 — Role/Skill + Memory (สัปดาห์ 7-8)
+### Phase 3 — Role/Skill + Memory + Backup (สัปดาห์ 7-8)
 - Skill registry + tool binding
 - Role/Skill assignment flow
-- Memory system (short + long + structured)
+- Memory system (short + long + structured) — เขียนลง `./data/`
 - Versioning ของ role/skill
+- **Backup system** (restic integration):
+  - `./data/` layout + `.backupignore`
+  - CLI: `gang backup {snapshot,list,restore,verify,export,import,prune,status}`
+  - WAL checkpoint + vector DB quiesce hooks
+  - Backup metadata manifest
+  - Scheduled snapshot (cron/launchd) + GFS retention
+  - Weekly restore drill (automated verify)
+  - `docs/RECOVERY.md` runbook
 
 ### Phase 4 — Inter-Agent + Orchestration (สัปดาห์ 9-10)
 - Message bus
@@ -223,6 +232,7 @@
 | **Plugin loading** | `importlib` (Python) / dynamic import (TS) |
 | **Testing** | pytest + vcr.py (record API calls) |
 | **Observability** | OpenTelemetry + simple dashboard |
+| **Backup** | restic (encrypted, dedup, GFS retention) |
 
 ---
 
@@ -252,6 +262,7 @@
 5. **Privacy — Memory Management** (ดูรายละเอียดในหมวด Privacy ด้านล่าง)
 6. **Vendor lock-in ของ feature เฉพาะ** (ดูรายละเอียดในหมวด Vendor Lock-in ด้านล่าง)
 7. **Capability flag → if-else เยอะ** (ดูรายละเอียดในหมวด Design Patterns ด้านล่าง)
+8. **Data loss / Disaster recovery** (ดูรายละเอียดในหมวด Backup & Recovery ด้านล่าง)
 
 ---
 
@@ -349,6 +360,98 @@ class MemorySensitivity(Enum):
 
 ### แนะนำสำหรับโปรเจกต์นี้
 เริ่มจาก **PII detection + sensitivity tagging + cascade delete + provider data opt-out** → ขยายเป็น encryption + on-prem provider เมื่อ production
+
+---
+
+## 💾 Backup & Recovery (รายละเอียด)
+
+### ปัญหา
+ทุกอย่างเก็บใน local (SQLite + Chroma + configs + logs) — เครื่องพัง / drive ตาย / ลบผิด / ransomware → หายหมด ต้องเริ่มใหม่ตั้งแต่ศูนย์
+
+### หลักการ
+- **State ทั้งหมดอยู่ใน `./data/`** เท่านั้น — restore โฟลเดอร์นี้กลับมา = ระบบกลับมา
+- Code/deps ไม่อยู่ใน backup (มี git + `uv.lock` อยู่แล้ว — clone ใหม่ + `uv sync` พอ)
+- Backup tool ต้อง **open source** + **encrypted** + **portable**
+
+### Tool: restic
+- BSD-2 license, encrypted (AES-256), dedup (content-addressed), incremental, append-only mode รองรับ
+- Repository ใช้ได้ทั้ง local disk / SFTP / S3-compatible → ปลายทางย้ายภายหลังได้
+
+### Storage layout
+
+```
+./data/
+├── sqlite/
+│   ├── agents.db          # agent + skill + role registry
+│   ├── memory.db          # structured facts ต่อ agent
+│   └── audit.db           # tool calls + teaching events
+├── chroma/                # vector DB (semantic memory)
+├── configs/               # YAML — capability flags, agent overrides
+└── logs/                  # JSONL — conversation transcripts
+```
+
+### Snapshot policy (GFS rotation)
+
+| Tier | ความถี่ | Retention | Trigger |
+|------|---------|-----------|---------|
+| Hourly | ทุก 1 ชม. | 24 ชม. | scheduled (cron/launchd) |
+| Daily | วันละครั้ง | 7 วัน | scheduled |
+| Weekly | สัปดาห์ละครั้ง | 4 สัปดาห์ | scheduled |
+| Monthly | เดือนละครั้ง | 12 เดือน | scheduled |
+| Tagged | manual | ไม่ลบ | ก่อน schema migration / release |
+
+`restic forget --keep-hourly 24 --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune`
+
+### CLI commands (จะ implement)
+
+```
+gang backup snapshot [--tag <name>]    # สร้าง snapshot ใหม่
+gang backup list                        # ดู snapshot ทั้งหมด
+gang backup restore <id> [--to <path>]  # restore ทับ ./data/ หรือไปที่ใหม่
+gang backup verify                      # restore ไป temp + integrity check
+gang backup export --to <file.tar>      # tarball encrypted ที่พกพา/อัปโหลดเองได้
+gang backup import <file.tar>           # restore จาก tarball
+gang backup prune                       # ลบตาม retention policy
+gang backup status                      # snapshot ล่าสุด + ขนาด repo
+```
+
+### Best practices ที่บังคับใช้
+
+| Practice | วิธี |
+|---|---|
+| **3-2-1 rule** | Tier 1: local restic repo, Tier 2: `gang backup export` → ผู้ใช้พา tarball ไปไว้ที่อื่น (USB/NAS/cloud), Tier 3: tag สำคัญส่ง self-host หรือ user storage |
+| **Encryption at rest** | restic encrypt ทุก snapshot ด้วย passphrase เก็บใน **macOS Keychain** (`security add-generic-password`) ห้ามอยู่ใน `.env` ที่ commit ได้ |
+| **Exclude secrets + noise** | `.env`, `*.key`, `__pycache__/`, `.venv/`, `.ruff_cache/`, `models/cached/` → `restic --exclude-file=.backupignore` |
+| **WAL checkpoint ก่อน snapshot** | รัน `PRAGMA wal_checkpoint(TRUNCATE)` กับ SQLite ทุกฐาน — กัน state ค้างใน WAL |
+| **Vector DB quiesce** | Pause embedding worker → `chroma_client.persist()` → snapshot → resume — กัน index corrupt |
+| **Backup metadata manifest** | เขียน `./data/.backup_manifest.json` ก่อน snapshot: `{git_sha, python_version, schema_version, chroma_version, timestamp}` → restore แล้วรู้ว่าใช้กับ code/lib version ไหน |
+| **Restore drill (weekly auto-verify)** | scheduled: pick snapshot ล่าสุด → restore ไป `/tmp/gang-restore-test` → integrity check → diff schema → report → ลบ. **backup ที่ไม่เคย verify = ไม่มี backup** |
+| **GFS retention** | ดูตารางข้างบน — ขนาดไม่บานปลาย แต่ยังย้อนได้ไกล |
+| **Named tags** | `restic backup --tag "before-schema-v3"` ทุก migration / release |
+| **Append-only mode** | `restic init --append-only` กัน accidental delete + ransomware ลบ backup ตาม |
+
+### Recovery runbook (`docs/RECOVERY.md`)
+ต้องมีเป็น checklist — RTO target **< 15 นาที** จากเครื่องเปล่าถึงใช้งานได้:
+
+1. Install `uv` + Python 3.12
+2. `git clone https://github.com/Sin1apachai/gangagent`
+3. `uv sync`
+4. Install `restic` (`brew install restic`)
+5. `gang backup restore <latest-id>` หรือ `gang backup import <file.tar>`
+6. สร้าง `.env` ใหม่ ใส่ API keys (ไม่อยู่ใน backup)
+7. `uv run pytest -q` (smoke test)
+8. `gang providers` (verify registry)
+
+### Risk acceptance (local-only choice)
+ผู้ใช้เลือก local disk เป็นปลายทางหลัก — ตระหนักว่า:
+- 🔴 **ไฟไหม้/ขโมย/drive ตาย → หายหมด** ถ้าไม่ได้ `gang backup export` ออกไปก่อน
+- ✅ บรรเทาด้วย workflow: `gang backup export` ส่ง tarball encrypted ไป USB/NAS/cloud เอง — อย่างน้อยสัปดาห์ละครั้ง
+- ⏳ Phase 5+ อาจเพิ่ม restic ปลายทาง S3-compatible (R2/B2/MinIO) เป็น tier 3 อัตโนมัติ
+
+### Deferred items (ทำภายหลัง)
+- **Audit log + immutable repo** → Phase 5 พร้อม observability
+- **Crypto-shredding** สำหรับ right-to-be-forgotten → Phase 3 พร้อม memory deletion
+- **Cost / size monitoring** + alert → Phase 5
 
 ---
 
