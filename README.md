@@ -70,7 +70,7 @@ cli/  ──▶  ProviderRegistry  ──▶  IAgentProvider (Protocol)
 | 6 | Observability + Eval + Watcher + **Guardrails / Safety** | ⏳ |
 | 7 | UI polish (REST → Web) | ⏳ |
 
-รายละเอียดแต่ละเฟส + risk/security/privacy → ดู `plan.md`
+รายละเอียดแต่ละเฟส + risk/security/privacy + cross-cutting concerns (config / logging / error / testing / resource limits / cost / i18n / Definition of Done) → ดู `plan.md`
 
 ## คำสั่งสำหรับ dev
 

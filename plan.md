@@ -18,6 +18,70 @@
 
 ---
 
+## 📚 Table of Contents
+
+**Foundation**
+- [วิสัยทัศน์ + ความต้องการพื้นฐาน](#-วิสัยทัศน์) · [การตัดสินใจสำคัญ (Locked Decisions)](#-การตัดสินใจสำคัญ) · [Glossary](#-glossary) · [สถาปัตยกรรมระดับสูง](#-สถาปัตยกรรมระดับสูง)
+
+**Core modules**
+- §1 Provider Abstraction · §2 Capability System · §3 Agent Lifecycle · §4 Personality Engine · §5 Skill/Role · §6 Memory · §7 Inter-Agent · §8 Observability · §9 Evaluation
+
+**Roadmap & risks**
+- [Phased Roadmap](#-แผนการพัฒนา-phased-roadmap) · [Definition of Done per Phase](#-definition-of-done-per-phase-รายละเอียด) · [Tech Stack](#️-tech-stack-ที่แนะนำ) · [Risks](#️-ความเสี่ยง--ข้อควรระวัง) · [System Agents (Mediator, Watcher)](#-system-agents-agent-หลังบ้าน)
+
+**Cross-cutting concerns** (foundational, ใช้ร่วมทุก feature)
+- [Configuration Strategy](#️-configuration-strategy-รายละเอียด) · [Logging & Tracing](#-logging--tracing-รายละเอียด) · [Error Handling Philosophy](#-error-handling-philosophy-รายละเอียด) · [Resource Limits & Performance Budget](#-resource-limits--performance-budget-รายละเอียด) · [Testing Strategy](#-testing-strategy-รายละเอียด) · [Cost Model & Enforcement](#-cost-model--enforcement-รายละเอียด) · [i18n Strategy](#-i18n-strategy-รายละเอียด)
+
+**Security / Safety / Privacy**
+- [Security — Tool Execution Sandbox](#-security--tool-execution-sandbox-รายละเอียด) · [Privacy — Memory Management](#-privacy--memory-management-รายละเอียด) · [Guardrails / Safety Filter](#️-guardrails--safety-filter-รายละเอียด)
+
+**Data & operations**
+- [Backup & Recovery](#-backup--recovery-รายละเอียด) · [Agent Snapshot / Time-travel](#-agent-snapshot--time-travel-รายละเอียด) · [Schema Migration](#️-schema-migration-รายละเอียด) · [Agent Introspection](#-agent-introspection-รายละเอียด)
+
+**Features**
+- [Profession Template](#-profession-template-รายละเอียด) · [Notification System](#-notification-system-รายละเอียด) · [MCP Integration](#-mcp-model-context-protocol-integration-รายละเอียด) · [Prompt Library + Versioning](#-prompt-library--versioning-รายละเอียด) · [RAG Pipeline](#-rag-retrieval-augmented-generation-pipeline-รายละเอียด) · [Scheduled Tasks](#-scheduled-tasks-รายละเอียด)
+
+**Patterns & meta**
+- [Vendor Lock-in](#-vendor-lock-in-ของ-feature-เฉพาะ-รายละเอียด) · [Design Patterns สำหรับ Capability Flag](#-design-patterns-สำหรับ-capability-flag-รายละเอียด) · [Quick Wins](#-quick-wins-ทำได้เร็ว-เห็นผลไว) · [Future Considerations](#-future-considerations-deferred) · [Locked Decisions deep dive](#-การตัดสินใจหลัก-locked-decisions)
+
+---
+
+## 📖 Glossary
+
+ศัพท์ที่ใช้ใน plan — definition ที่ผูกกับโปรเจกต์นี้ (ไม่ใช่ความหมายทั่วไป)
+
+| คำ | ความหมาย |
+|---|---|
+| **Agent** | instance ของ AI ที่มีชื่อ, นิสัย (traits), บทบาท (role), ทักษะ (skills), memory ของตัวเอง |
+| **Provider** | ค่าย LLM (Claude, OpenAI, Gemini, Ollama, ...) — implement `IAgentProvider` |
+| **Capability** | ความสามารถของ provider/agent (text_gen, streaming, vision, tool_use, thinking_mode, ...) — flag-based |
+| **Capability Router** | logic เลือก provider ที่เหมาะกับ task ตาม capability ที่ต้องการ |
+| **Personality** | ชุดของ trait ที่ระบบตีความจากชื่อ — เป็น USP ของระบบ |
+| **Trait** | มิติของบุคลิก (formality, playfulness, conscientiousness, verbosity, tone, ...) ค่า 0.0-1.0 |
+| **Role** | บทบาทหลักที่ผู้ใช้กำหนด (`"ผู้ช่วยเขียนโปรแกรม"`) — runtime concept |
+| **Skill** | ความสามารถเฉพาะ (`Python`, `SQL`, `marketing`) ผูกกับ tool — runtime concept |
+| **Profession Template** | preset bundle ที่ pre-fill role + skills + trait-bias — factory ที่สลายตัวหลัง apply, ไม่ใช่ field ถาวร |
+| **Memory** | ข้อมูลของ agent — short-term (buffer), long-term (vector), structured (KV) |
+| **Knowledge / Collection** | document store ภายนอกที่ agent อ้างอิงผ่าน RAG (≠ Memory) |
+| **System Agent** | agent หลังบ้าน — **Mediator** (ตัดวงสนทนา), **Watcher** (ตรวจ provider changelog) |
+| **MCP** | Model Context Protocol — open standard สำหรับเชื่อม tool/resource/prompt กับ AI agent |
+| **RAG** | Retrieval-Augmented Generation — pipeline ingest → chunk → embed → retrieve → context |
+| **Prompt Block** | ส่วนหนึ่งของ system prompt (personality / role / skill / memory) ที่ versioned แยกกัน |
+| **Notifier** | channel แจ้งเตือน (Telegram/Discord/Line/Email/Webhook/Console) implement `INotifier` |
+| **Severity** | ระดับความสำคัญของ notification: INFO < WARN < ERROR < CRITICAL |
+| **Guardrail** | filter ที่อยู่ก่อน/หลัง agent — ป้องกัน prompt injection, PII leak, NSFW, ... |
+| **Strict mode / Flexible mode** | capability routing — strict = ใช้ provider เดิมเท่านั้น, flexible = ยืม provider อื่นได้ |
+| **Mediator intervention** | เมื่อ multi-agent คุยกันวน 3 ครั้ง — Mediator แทรกเพื่อตัด loop |
+| **GFS rotation** | Grandfather-Father-Son retention policy สำหรับ backup |
+| **`./data/`** | state root — single source of truth ที่ backup ครอบคลุม |
+| **Phase X done** | บรรลุ Definition of Done ของ phase นั้น (ดู §Definition of Done per Phase) |
+| **Capability Flag approach** | แต่ละ provider declare ว่าตัวเองทำอะไรได้ — runtime branch จาก flag ไม่ใช่จากชื่อ provider |
+| **Plug-in pattern** | เพิ่มของใหม่ = drop file + decorator/YAML, ไม่แก้โค้ดอื่น (providers, notifiers, professions, mcp servers) |
+| **Snapshot version pin** | reference เก็บเป็น `name@version` กัน upstream เปลี่ยน → instance เดิมพัง |
+| **Reveal UX** | UI moment ที่แสดง trait card หลังตั้งชื่อ ให้ผู้ใช้เห็นว่าระบบตีความชื่ออย่างไร |
+
+---
+
 ## 🏗️ สถาปัตยกรรมระดับสูง
 
 ```
@@ -271,6 +335,87 @@
 
 ---
 
+## ✅ Definition of Done per Phase (รายละเอียด)
+
+หลักการ: phase เสร็จ ≠ "ทำของเสร็จแล้ว" แต่ = **gate** ต่อไปนี้ผ่านครบ — กัน scope creep + บอกชัดเจนเมื่อพร้อมขยับ
+
+### Universal gates (ทุก phase)
+- ✅ ทุก unit + contract + integration test ผ่าน
+- ✅ ruff + mypy strict ไม่มี error
+- ✅ coverage ของ code ใหม่ ≥ 70% (≥ 90% ถ้าเป็น core: registry/router/provider)
+- ✅ doc สำหรับ feature ใหม่ใน plan.md/CLAUDE.md/README updated
+- ✅ commit history clean (ไม่มี "WIP" / "fix typo" ที่ไม่ squash)
+
+### Phase 0 — Foundation
+- ✅ `uv sync` work clean
+- ✅ `gang ask "..."` ทำงาน live (อย่างน้อย 1 test มี API key)
+- ✅ `gang stream "..."` token-by-token output
+- ✅ `ClaudeProvider` ผ่าน contract test
+- ✅ `tests/` พื้นฐาน (registry + message format + mocked chat) ผ่าน
+
+### Phase 1 — Multi-Provider + Capability + MCP + Migration
+- ✅ ≥ 3 provider ผ่าน contract test (claude + openai + gemini)
+- ✅ Capability config YAML ทำงาน → CapabilityRouter เลือก provider ถูก
+- ✅ Tool schema converter test ครอบ 3 ค่าย × tool ตัวอย่าง
+- ✅ MCP filesystem server เชื่อมและเรียก tool ได้จริง
+- ✅ Schema migration runner: up + down round-trip ทุก migration
+- ✅ Configuration Strategy section enforced (1 folder + Pydantic validation)
+
+### Phase 2 — Lifecycle + Personality + Prompt Library
+- ✅ Personality Engine: ชื่อเดียวกัน → trait เดิมเสมอ (reproducibility test)
+- ✅ Reveal UX การ์ดแสดงผลใน CLI (Rich)
+- ✅ Trait override + persist
+- ✅ Prompt Library: filesystem-backed versioning + agent pinning
+- ✅ ≥ 2 prompt block templates (personality + role) มี versioning + diff CLI
+
+### Phase 3 — Skill/Role + Memory + RAG + Backup + Profession
+- ✅ Skill registry + tool binding ทำงาน
+- ✅ RAG: ingest PDF + markdown → retrieve top-k → answer มี citation
+- ✅ Backup: snapshot + restore + verify drill อัตโนมัติผ่าน
+- ✅ Restore drill ทำ weekly cron + report
+- ✅ 5+ Profession templates ใช้งานได้ + spawn ผ่าน `--profession`
+- ✅ Memory per-agent isolation test ผ่าน
+
+### Phase 4 — Notification + Scheduled Tasks
+- ✅ 4 channels (Telegram, Discord, Line, Email) ส่ง test ผ่านจริง
+- ✅ Routing engine: match rules ทำงานตาม spec
+- ✅ Hot reload: แก้ YAML → effect ภายใน 1 วินาที
+- ✅ Scheduled task รัน cron job ได้จริง + emit ผ่าน notifier
+- ✅ Event bus: backup.failed → trigger → notify
+
+### Phase 5 — Inter-Agent + Mediator
+- ✅ Agent A delegate งานให้ B + ได้ผลกลับ
+- ✅ Mediator detect loop 3-cycle ในการสนทนาทดสอบ
+- ✅ Mediator intervention → ส่ง notification CRITICAL ถ้าแก้ไม่ได้
+- ✅ Multi-agent workflow DAG ทำงานง่ายๆ ได้
+
+### Phase 6 — Observability + Eval + Guardrails
+- ✅ OpenTelemetry traces ส่งออกไป backend ทดสอบได้
+- ✅ Cost dashboard แสดง breakdown ต่อ agent/task
+- ✅ Personality consistency test: agent ตอบ 100 prompts → trait stability score ≥ 0.85
+- ✅ Skill benchmark: ≥ 3 skill มี test set + score
+- ✅ Guardrail: prompt injection detection rate ≥ 80% บน test set
+- ✅ Watcher Agent: ดึง provider changelog ได้ + emit event
+- ✅ Resource limits enforced (verified ด้วย load test)
+
+### Phase 7 — UI + Polish (OSS-ready)
+- ✅ REST API spec (OpenAPI) + ทุก CLI command มี API equivalent
+- ✅ Web UI: spawn → name → profession → train → chat ทำงานครบ
+- ✅ docs/ เขียนครบ (getting-started, architecture, recipes)
+- ✅ RECOVERY.md + restore drill 15-min RTO verified
+- ✅ License finalized (Apache 2.0) + LICENSE file
+- ✅ CONTRIBUTING.md, CODE_OF_CONDUCT.md
+- ✅ Public roadmap published
+- ✅ 5+ example agents shipped (cover varied professions)
+
+### Cross-phase health metrics (ต้อง track ตลอด)
+- Cold-start time `gang --help` < 100ms
+- Test suite full run < 60s (ยกเว้น live)
+- `./data/` size growth predictable + monitored
+- Cost per `gang ask "..."` smoke test ≤ baseline ± 10%
+
+---
+
 ## 🛠️ Tech Stack ที่แนะนำ
 
 | ส่วน | ตัวเลือก |
@@ -291,6 +436,12 @@
 | **Scheduler** | `apscheduler` (local cron-like, async) |
 | **Guardrails** | `presidio-analyzer` (PII), regex-based prompt injection patterns + optional `rebuff` |
 | **DB Migration** | Light custom (linear SQL files) — ไม่ใช้ Alembic เต็ม |
+| **Config validation** | `pydantic` (มีอยู่) + env interpolation via custom loader |
+| **Logging** | `structlog` (JSON output) + `python-json-logger` (stdlib bridge) |
+| **Tracing** | `opentelemetry-api` + `opentelemetry-sdk` + exporter (Tempo/Jaeger) |
+| **i18n** | `babel` (date/number/plural) + `gettext` (`.po` files) — Phase 7+ |
+| **Circuit breaker** | `purgatory` หรือ custom (lightweight) |
+| **Retry** | `tenacity` (decorator-based, async-friendly) |
 
 ---
 
@@ -326,6 +477,9 @@
 11. **Prompt injection + Output leakage** (ดูรายละเอียดในหมวด Guardrails) — user/document หลอก agent + agent เผลอเปิดเผยข้อมูล sensitive
 12. **Schema drift / Incompatible backup** (ดูรายละเอียดในหมวด Schema Migration) — DB เก่า restore ไม่ได้ใน code ใหม่
 13. **MCP server availability** (ดูรายละเอียดในหมวด MCP Integration) — 3rd party MCP server หยุดดูแล → tool ที่ผูกอยู่หาย
+14. **Config drift across YAMLs** (ดูรายละเอียดในหมวด Configuration Strategy) — config 6+ ไฟล์ inconsistent หรือ env var ไม่ตั้ง = boot ผ่านแต่ runtime พัง
+15. **Resource runaway** (ดูรายละเอียดในหมวด Resource Limits & Performance Budget) — multi-agent loop, schedule overlap, memory growth ไม่จำกัด → ลม + ค่าใช้จ่ายพุ่ง
+16. **Cost surprise** (ดูรายละเอียดในหมวด Cost Model & Enforcement) — burn budget ใน 1 ชั่วโมงโดย agent recursive — tracking only ไม่พอ ต้อง enforcement
 
 ---
 
@@ -423,6 +577,373 @@ class MemorySensitivity(Enum):
 
 ### แนะนำสำหรับโปรเจกต์นี้
 เริ่มจาก **PII detection + sensitivity tagging + cascade delete + provider data opt-out** → ขยายเป็น encryption + on-prem provider เมื่อ production
+
+---
+
+## ⚙️ Configuration Strategy (รายละเอียด)
+
+### ปัญหา
+โปรเจกต์มี YAML config 6+ ไฟล์ (notifications, mcp_servers, scheduled_tasks, guardrails, professions, prompts, capability flags) — ต้องการความสม่ำเสมอ ไม่ใช่แต่ละ subsystem ทำคนละแบบ
+
+### หลักการ
+- **One folder**: ทุก config อยู่ใน `./data/configs/` (อยู่ใน `./data/` → ครอบ backup)
+- **Precedence**: `CLI flag` > `env var` > `YAML config` > `code default` — ชัดเจน 1 ทาง
+- **Secrets แยก**: API keys/tokens อยู่ใน `.env` เท่านั้น — YAML ใช้ `${ENV_VAR}` interpolation
+- **Type-safe**: ทุก YAML แปลงเป็น Pydantic model ตอน load — type error = boot fail
+- **Schema versioned**: แต่ละ config มี `schema_version` field — runtime ตรวจก่อน apply
+
+### Layout
+
+```
+./data/configs/
+  capabilities.yaml          # which provider supports what
+  notifications.yaml         # channels + routing rules
+  mcp_servers.yaml           # MCP server endpoints
+  scheduled_tasks.yaml       # cron-like jobs
+  guardrails.yaml            # safety policies
+  rag_collections.yaml       # knowledge collections
+  .schema_versions.json      # tracked version per file
+```
+
+### Loading + validation
+
+```python
+class ConfigLoader:
+    def load(self, path: Path, model: type[BaseModel]) -> BaseModel:
+        raw = yaml.safe_load(path.read_text())
+        interpolated = self._interpolate_env(raw)   # ${ENV_VAR} → value
+        config = model.model_validate(interpolated)  # Pydantic validation
+        self._check_schema_version(config)
+        return config
+
+    def _interpolate_env(self, obj):
+        # recursive replace ${VAR} with os.environ[VAR]
+        # raise if VAR not set (no silent empty string)
+```
+
+### Hot reload pattern (consistent ทุก subsystem)
+- `watchfiles` ดู `./data/configs/` ทั้ง folder
+- เปลี่ยน file → debounce 500ms → emit event `config.<name>.reloaded`
+- แต่ละ subsystem subscribe event ที่ตัวเองสน → call own `reload()` method
+- ถ้า validation ล้ม → log + keep old config (ไม่ crash)
+- emit `config.reload_failed` ผ่าน Notification ระดับ ERROR
+
+### CLI
+
+```
+gang config list                  # ทุก config + schema_version
+gang config validate              # ตรวจทุก file
+gang config validate <file>       # ตรวจไฟล์เดียว
+gang config show <file>           # render หลัง interpolation
+gang config diff <file> <git-ref> # เทียบกับ git history
+gang config reload                # force reload ทั้งหมด
+```
+
+### Best practices
+- **No magic config in code** — ทุก tunable param อยู่ใน YAML (ไม่ใช่ `MAX_RETRIES = 3` ใน source)
+- **Defaults documented in `*.example.yaml`** ใน repo — user copy ไป `data/configs/` แล้วแก้
+- **Boot order**: load all configs → validate ทั้งหมด → ถ้า error ใดๆ → fail fast (ไม่เริ่ม partial)
+- **Audit log** ทุก reload event (สำหรับ debug)
+- **Migration script** เมื่อ schema_version bump (auto rewrite + backup old)
+
+---
+
+## 🪵 Logging & Tracing (รายละเอียด)
+
+### ปัญหา
+plan มี `OpenTelemetry` ใน stack แต่ไม่มี:
+- structured logging schema
+- log levels policy
+- trace ID propagation ข้าม agent ↔ provider ↔ tool ↔ notifier
+- where logs go + retention
+- sensitive data handling (ห้าม log API key/PII)
+
+Multi-agent ใน Phase 5 จะ debug ไม่ได้ถ้าไม่มี trace
+
+### หลักการ
+- **Structured (JSON) เท่านั้น** — ห้าม free-text log (grep-friendly แต่ machine-unfriendly)
+- **Trace ID propagation ทุก call** — request → agent → provider → tool → notifier ใช้ trace ID เดียวกัน
+- **Sensitive-aware** — API key/PII redact ก่อน log (ใช้ Presidio เดียวกับ §Privacy)
+- **Tier-based retention** — DEBUG 24h, INFO 7d, WARN/ERROR 30d, CRITICAL 1y
+
+### Log schema (ทุก event ต้องมี)
+
+```json
+{
+  "ts": "2026-05-26T07:30:00.123Z",
+  "level": "INFO",
+  "logger": "gangagent.providers.claude",
+  "trace_id": "tr_abc123",
+  "span_id": "sp_def456",
+  "parent_span_id": "sp_xyz789",
+  "agent_id": "agent_มานี",
+  "event": "provider.chat.complete",
+  "duration_ms": 1234,
+  "data": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 100,
+    "output_tokens": 200
+  }
+}
+```
+
+### Trace structure (OpenTelemetry-compatible)
+
+```
+chat_request (root)
+├── agent.compose_prompt
+├── guardrail.input_check
+├── provider.chat
+│   ├── http.request
+│   └── http.response
+├── tool.calculator              (ถ้ามี tool call)
+│   └── sandbox.execute
+├── guardrail.output_check
+├── memory.write
+└── notify.dispatch              (ถ้า emit event)
+```
+
+### File structure
+
+```
+src/gangagent/observability/
+  logging.py                 # structured logger setup
+  tracing.py                 # OTel tracer + context propagation
+  redact.py                  # PII/secret redaction filter
+  schema.py                  # log event types (Pydantic)
+```
+
+### Log levels policy
+
+| Level | ใช้เมื่อ | ตัวอย่าง |
+|---|---|---|
+| DEBUG | dev debugging | full prompt content (redacted), retrieval results |
+| INFO | normal operation | agent.created, provider.chat.complete, backup.complete |
+| WARN | recoverable issue | provider.retry, mediator.loop_detected, rate_limit.hit |
+| ERROR | failure that affects user | provider.unavailable, tool.failed, backup.failed |
+| CRITICAL | system integrity at risk | mediator.loop_unresolved, restore_drill.failed, data.corruption |
+
+### Output destinations
+- **Default**: JSONL ไฟล์ใน `./data/logs/` rotation รายวัน
+- **Phase 6+**: optional OpenTelemetry exporter (Tempo, Jaeger, ...)
+- **Notification bridge**: ERROR/CRITICAL → emit event → routing engine
+
+### Best practices
+- **One log per event** — ไม่ใช่ log "starting X" + "finished X" 2 อัน → ใช้ duration field แทน
+- **No log in hot path without `if logger.isEnabledFor()`** — กัน format cost
+- **Async log writer** — ห้าม block agent execution
+- **PII redaction at log layer** — ไม่ใช่ caller responsibility
+- **Trace ID จาก context** — ใช้ `contextvars` (Python) ไม่ต้องส่ง explicit ทุก function
+
+---
+
+## 💥 Error Handling Philosophy (รายละเอียด)
+
+### ปัญหา
+หลาย subsystem มี failure mode ต่างกัน — แต่ละ section ตัดสินใจของตัวเอง → inconsistent. ต้องมี policy กลาง
+
+### Hierarchy ของ error
+
+```
+GangAgentError (base)
+├── ConfigError             # config invalid, schema mismatch
+├── ProviderError
+│   ├── ProviderUnavailable
+│   ├── ProviderRateLimited
+│   ├── ProviderAuthFailed
+│   └── ProviderInvalidRequest
+├── ToolError
+│   ├── ToolNotFound
+│   ├── ToolValidationFailed
+│   └── ToolExecutionFailed
+├── MemoryError
+├── GuardrailViolation
+└── SystemError             # internal bug (should never happen)
+```
+
+### Policy table
+
+| Error type | Default action | Retry? | User-visible? | Notify? |
+|---|---|---|---|---|
+| `ProviderRateLimited` | retry with backoff | ✅ (exp, max 3) | only if final fail | INFO |
+| `ProviderUnavailable` | failover (flexible mode) → error | ✅ (1 attempt to other provider) | yes | WARN |
+| `ProviderAuthFailed` | fail fast | ❌ | yes (re-config prompt) | ERROR |
+| `ToolValidationFailed` | reject + return to agent | ❌ | yes (ขอ retry args) | log only |
+| `ToolExecutionFailed` | propagate → agent decide | ❌ at infra | yes (agent retry) | log only |
+| `GuardrailViolation` | block (default) | ❌ | yes (refuse + reason) | WARN |
+| `MemoryError` | swallow + log | ❌ | no (graceful degradation) | ERROR |
+| `ConfigError` (boot) | fail fast | ❌ | yes (boot fail) | (can't notify) |
+| `ConfigError` (reload) | keep old config | ❌ | log | ERROR |
+| `SystemError` | crash + dump | ❌ | error message | CRITICAL |
+
+### Retry pattern (unified)
+
+```python
+@retry(
+    retryable=(ProviderRateLimited, ProviderUnavailable),
+    max_attempts=3,
+    backoff=ExponentialBackoff(base=1, max=30),
+    jitter=True,
+    on_giveup=lambda e: notify(Severity.ERROR, ...),
+)
+async def call_provider(...):
+    ...
+```
+
+→ ใช้ decorator เดียวกันทั่ว project
+
+### Circuit breaker (สำหรับ external)
+
+- Provider/MCP server fail 5 ครั้งใน 1 นาที → **open** circuit (block call ต่อ)
+- หลัง 30 วินาที → **half-open** (ลองเดิม 1 call)
+- สำเร็จ → **closed**, ล้ม → กลับ **open** เพิ่ม backoff
+- ใช้กับ provider, MCP server, notifier endpoint, embedding service
+
+### Best practices
+- **No bare `except:`** — ระบุ exception type ชัดเจน
+- **Errors carry context** — `raise ProviderUnavailable("claude", trace_id=...)` ไม่ใช่แค่ `raise`
+- **Surface to user with action** — error message บอกว่าผู้ใช้ทำอะไรได้ (`Re-run with --provider gpt`)
+- **Fail loud in dev, gracefully in prod** — env-aware severity
+- **Don't swallow `SystemError`** — เป็น bug, ต้อง surface
+
+---
+
+## 📏 Resource Limits & Performance Budget (รายละเอียด)
+
+### ปัญหา
+async ทุกที่แต่ไม่มี: concurrency limit, connection pool size, memory cap, disk cap, cold-start budget. cost tracking มี แต่ไม่ enforce. infrastructure runaway ได้
+
+### Limits ที่ต้องมีค่าจริง (default)
+
+| Resource | Limit | Action เมื่อชน |
+|---|---|---|
+| Concurrent agents | 10 | queue |
+| HTTP connection pool ต่อ provider | 20 | wait (with timeout) |
+| Token budget ต่อ agent ต่อวัน | 1M | warn + require confirm |
+| Token budget ต่อ task | 100K | hard stop |
+| Cost ต่อ agent ต่อวัน | $5 | warn + notify |
+| Cost ต่อ task | $1 | hard stop |
+| Memory size ต่อ agent (vector chunks) | 10K | warn (suggest archive) |
+| Disk usage `./data/` | 10GB | warn |
+| Tool execution time | 30s | timeout |
+| Single LLM call timeout | 120s | abort |
+| Conversation buffer length | 50 messages | sliding window (drop oldest) |
+| Audit log retention | 90 days | auto-prune (configurable) |
+
+ทุกค่าตั้งใน `data/configs/limits.yaml` — ไม่ใช่ hard-code
+
+### Cold-start budget
+- `gang --help` → <100ms (no imports of providers/notifiers)
+- `gang providers` → <500ms (lazy discover)
+- `gang ask "hi"` first call → <2s (cold) / <500ms (warm)
+- Background services start เมื่อใช้จริง — ไม่ใช่ boot ทั้งหมด
+
+### Connection pooling
+- **HTTP**: `httpx.AsyncClient` shared per provider — pool size 20
+- **DB**: SQLite WAL mode, connection per task (lightweight, no pool)
+- **MCP**: 1 process ต่อ MCP server (spawn on demand, kill after idle 5min)
+
+### Caching budgets
+- **Prompt cache** (Anthropic) — enable for system prompt + RAG context (cache hit > 80% target)
+- **Embedding cache** — content hash → embedding lookup (skip re-embed)
+- **Tool result cache** — read-only tools (search, fetch) cache 5min — write tools never
+
+### CLI
+
+```
+gang limits show                       # ดู current limits + utilization
+gang limits set <key> <value>          # adjust
+gang stats                             # cold-start time, memory, disk
+```
+
+### Best practices
+- **Soft limit first (warn) → hard limit (block)** — user เห็นปัญหาก่อนพัง
+- **Per-agent override** — agent บางตัวต้องใช้ token เยอะกว่า → override ได้
+- **Backpressure**: queue agent ใหม่ ไม่ใช่ reject — แสดง position
+- **Graceful shutdown**: รับ SIGTERM → finish current task → save state → exit
+
+---
+
+## 🧪 Testing Strategy (รายละเอียด)
+
+### ปัญหา
+`pytest + vcr.py` อยู่ใน stack แต่ไม่มี: test pyramid spec, mock boundary, fixture organization, contract tests. ทุกคนเขียนเทสต์คนละแบบ = maintenance นรก
+
+### Test pyramid (target ratio)
+
+```
+       ▲  E2E (5%) — live API, full CLI flow, slow
+      ╱╲  Integration (25%) — multi-component, VCR recordings, no live API
+    ╱────╲  Contract (10%) — interface compliance per provider/notifier
+  ╱────────╲  Unit (60%) — pure function, mocked deps, fast
+```
+
+### Test categories
+
+| Type | Folder | Marker | Runs in CI | Speed |
+|---|---|---|---|---|
+| Unit | `tests/unit/` | (default) | every commit | <1s total |
+| Contract | `tests/contract/` | `@pytest.mark.contract` | every commit | <10s |
+| Integration | `tests/integration/` | `@pytest.mark.integration` | every commit (VCR) | <30s |
+| E2E (mocked) | `tests/e2e/` | `@pytest.mark.e2e` | every commit | <60s |
+| E2E (live) | `tests/e2e_live/` | `@pytest.mark.live` | manual / nightly | minutes |
+
+### Contract tests (สำคัญสำหรับ plug-in pattern)
+
+ทุก provider/notifier/profession ผ่าน contract suite เดียวกัน:
+
+```python
+# tests/contract/test_provider_contract.py
+@pytest.mark.parametrize("provider_name", ProviderRegistry.names())
+async def test_chat_returns_response(provider_name):
+    provider = ProviderRegistry.create(provider_name, test_config)
+    response = await provider.chat([Message(role=USER, content="hi")])
+    assert isinstance(response, Response)
+    assert response.content
+    assert response.usage.input_tokens > 0
+
+@pytest.mark.parametrize("provider_name", ProviderRegistry.names())
+def test_capabilities_declared(provider_name):
+    provider = ProviderRegistry.create(provider_name, test_config)
+    # must support at minimum TEXT_GENERATION
+    assert provider.supports(Capability.TEXT_GENERATION)
+```
+
+→ เพิ่ม provider ใหม่ = test ผ่านทันที (ถ้า implement ถูก) — ไม่ต้องเขียน test แยก
+
+### Mock strategy
+- **Mock at SDK boundary** — `AsyncAnthropic.messages.create` mocked, ไม่ใช่ wrap ใน adapter ของเราอีกที (เห็นแล้วใน `tests/test_claude_chat.py`)
+- **VCR for integration** — record API จริงครั้งเดียว เก็บ cassette ใน `tests/cassettes/` → replay ทุกครั้งหลังจากนั้น (ไม่ burn tokens)
+- **Fixture composition** — `conftest.py` ที่ root + per-folder, ไม่ duplicate setup
+
+### Fixtures พื้นฐาน (`conftest.py`)
+
+```python
+@pytest.fixture
+def test_config() -> ProviderConfig: ...
+
+@pytest.fixture
+def mock_provider() -> IAgentProvider: ...
+
+@pytest.fixture
+def temp_data_dir(tmp_path) -> Path: ...   # isolated ./data/
+
+@pytest.fixture
+def fake_anthropic_message(text: str): ...   # ใช้ใน tests/test_claude_chat.py แล้ว
+```
+
+### CI gates
+- ทุก commit: unit + contract + integration (VCR) ผ่าน
+- ทุก PR: เพิ่ม coverage report — coverage drop > 5% ต้อง explain
+- nightly: live E2E (paid tokens) — แตะแค่ smoke test เล็กๆ
+- pre-release: full E2E live + soak test
+
+### Best practices
+- **Test name = behavior** — `test_chat_returns_normalized_response`, ไม่ใช่ `test_chat_1`
+- **One assert per test** เมื่อทำได้
+- **No live API in unit/contract** — ใช้ mock/VCR เท่านั้น
+- **Test isolation** — temp dir per test, no shared state
+- **Coverage target**: 70% overall, 90% สำหรับ core (provider/registry/router)
 
 ---
 
@@ -1462,6 +1983,245 @@ gang db new <name>                    # scaffold migration file
 
 ### แนะนำสำหรับโปรเจกต์นี้
 Phase 1 — วาง foundation ตั้งแต่ก่อนเริ่มเก็บข้อมูลถาวร ทำง่ายๆ (linear version + raw SQL) ไม่ต้อง Alembic เต็มตัว ขยายภายหลังถ้าจำเป็น
+
+---
+
+## 💰 Cost Model & Enforcement (รายละเอียด)
+
+### ปัญหา
+plan §8 มี "cost tracking" แต่ไม่มี: pricing source, currency, time window, per-agent budget enforcement, action เมื่อชน limit. ตอน multi-agent หรือ schedule task → run loop = burn budget ภายในชั่วโมง
+
+### Data model
+
+```python
+class PricingSheet(BaseModel):
+    provider: str
+    model: str
+    input_per_1m: Decimal           # USD per 1M input tokens
+    output_per_1m: Decimal
+    cached_input_per_1m: Decimal
+    effective_from: datetime
+    source: str                     # "anthropic_docs_2025-01-15"
+
+class CostRecord(BaseModel):
+    timestamp: datetime
+    trace_id: str
+    agent_id: str
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cached_input_tokens: int
+    cost_usd: Decimal               # computed at record time (lock in)
+    task_tag: str | None
+
+class Budget(BaseModel):
+    scope: Literal["global", "agent", "task"]
+    scope_id: str | None
+    period: Literal["per_run", "hourly", "daily", "monthly"]
+    limit_usd: Decimal
+    soft_threshold: float = 0.8     # warn ที่ 80%
+    on_exceed: Literal["block", "warn", "throttle"]
+```
+
+### Pricing source
+- **Manual YAML** ใน `data/configs/pricing.yaml` — update เมื่อ provider เปลี่ยน
+- **Watcher Agent** (Phase 6) เช็ค provider page ทุกวัน → flag ถ้าราคาเปลี่ยน → propose update
+- เก็บ history (ไม่ overwrite) — restore ต้องรู้ราคาที่ใช้ตอนนั้น
+
+### Enforcement flow
+
+```
+Before LLM call:
+  estimated_cost = estimate(prompt, max_tokens, pricing)
+  if (agent_budget + estimated_cost > limit) and on_exceed == "block":
+    raise BudgetExceeded
+  if estimated_cost > task_budget:
+    raise TaskBudgetExceeded
+
+After LLM call:
+  actual_cost = compute(response.usage, pricing)
+  record(CostRecord)
+  if cumulative > soft_threshold:
+    notify(WARN, "Budget X% used")
+```
+
+### CLI
+
+```
+gang cost summary [--scope agent|task] [--since 1d]
+gang cost agent <id>                # breakdown by model + period
+gang cost budgets list
+gang cost budgets set --agent <id> --limit 5 --period daily --on-exceed block
+gang cost forecast --task "..." --model claude-sonnet-4-6   # pre-run estimate
+gang cost export --format csv --since 30d                    # for accounting
+```
+
+### Best practices
+- **Lock pricing at record time** — เปลี่ยนราคาภายหลังไม่กระทบ history
+- **Currency: USD เป็น canonical** — แปลงเป็น THB ใน display layer
+- **Per-task budget hardest** — ป้องกัน runaway loop (กรณี multi-agent)
+- **Soft warn ก่อน hard block** — user เห็นปัญหาก่อนถูกตัด
+- **Audit log integration** — เชื่อมกับ trace_id (§Logging) → ทุก call match cost record
+
+---
+
+## 🌐 i18n Strategy (รายละเอียด)
+
+### ปัญหา
+- plan ภาษาไทย, code ภาษาอังกฤษ, CLI message ผสม
+- `Trait.preferred_language` มี แต่ไม่มี policy: agent default ภาษาอะไร? CLI ภาษาอะไร?
+- Profession YAML มี `display_name` ภาษาไทย — Skill/Role ล่ะ?
+
+### Policy
+
+| Surface | ภาษา | เหตุผล |
+|---|---|---|
+| **Code, comments, function names** | English | OSS friendly, lingua franca |
+| **Commit messages, PR titles** | English | searchable, contributor-friendly |
+| **plan.md, docs/** | Thai (primary) + English keys | user เป็นไทย — keep until OSS-ready |
+| **CLI help text** | English (Phase 0-6) → i18n (Phase 7+) | scope creep ถ้าทำเร็ว |
+| **Error messages** | English with `Trait.preferred_language` override | English ก่อน |
+| **System prompts** | match `Trait.preferred_language` (default Thai สำหรับ user ไทย) | personality consistency |
+| **Agent display name** | user-chosen (Thai/English/mixed OK) | identity |
+| **Profession display_name** | Thai (primary user base) + key in English | UI shows Thai, code refs English |
+| **Notification message** | match channel's locale preference | culture-aware |
+
+### Detection
+```python
+def detect_user_locale() -> str:
+    return (
+        os.getenv("GANG_LOCALE")
+        or os.getenv("LANG", "").split(".")[0]   # th_TH.UTF-8 → th_TH
+        or "en_US"
+    )
+```
+
+### Translation strategy (Phase 7+)
+- Use **gettext** (`.po` files) — standard, tooling support
+- `_()` wrap ทุก user-facing string
+- Translation extracted to `locales/th_TH/LC_MESSAGES/gangagent.po`
+- Initially English-only with `_()` wrap — add Thai later (no rework)
+
+### Best practices
+- **Don't concatenate translated strings** — `f"You have {n} apples"` ไม่ใช่ `_("You have") + n + _("apples")`
+- **Pluralization** ผ่าน `ngettext` — กัน "1 apples"
+- **Date/time** ใช้ `babel` — locale-aware format
+- **Number** ใช้ `babel.numbers` — Thai uses different group separator
+- **RTL languages** (Hebrew/Arabic) — defer to Phase 8+ ถ้าจำเป็น
+
+---
+
+## 🔍 Agent Introspection (รายละเอียด)
+
+### ปัญหา
+Agent มี state เยอะ (name, traits, role, skills, prompt bindings, memory size, recent calls, cost, tool allowlist, ...) — debug ทำไงเมื่อ agent ตอบประหลาด? ตอน multi-agent debug ยิ่งยาก
+
+### CLI
+
+```
+gang agent list                     # ทุก agent + status สั้น
+gang agent inspect <id>             # full state (interactive — รายละเอียดด้านล่าง)
+gang agent history <id> [--last N]  # recent conversations
+gang agent traits <id>              # personality breakdown
+gang agent prompt <id>              # rendered system prompt ตอนนี้
+gang agent memory <id> [--query x]  # search memory
+gang agent cost <id>                # cost breakdown
+gang agent diff <id1> <id2>         # เทียบ 2 agents
+gang agent export <id> --to <file>  # export bundle (สำหรับ marketplace ใน Future)
+```
+
+### Inspect output (rich-formatted)
+
+```
+╭─ agent_มานี (Active) ──────────────────────────────────╮
+│ ID:           agent_a1b2c3                             │
+│ Created:      2026-05-26 14:23 (3 hours ago)           │
+│ Profession:   software_engineer@v1.0                   │
+│                                                        │
+│ Traits (from name "มานี" + profession bias):            │
+│   formality:        ████████░░  0.7                    │
+│   playfulness:      ██████░░░░  0.5                    │
+│   conscientiousness:█████████░  0.85 (+0.3 bias)       │
+│   verbosity:        ████░░░░░░  0.4 (-0.1 bias)        │
+│   language:         th                                 │
+│                                                        │
+│ Role:    "ช่วยออกแบบ/เขียน/รีวิวโค้ด..."                  │
+│ Skills:  python, git, debugging, system_design         │
+│ Tools:   code_exec, web_search, file_read, file_write  │
+│                                                        │
+│ Prompt bindings:                                       │
+│   personality: personality_reinforcement@v1.2          │
+│   role:        role_block@v1.0                         │
+│   memory:      memory_block@v1.0                       │
+│                                                        │
+│ Memory:  142 chunks · 18 MB · last write 2 min ago     │
+│ Cost (today): $0.42 / $5.00 budget                     │
+│ Recent calls: 23 (avg latency 1.4s)                    │
+│ Provider:    claude (claude-sonnet-4-6)                │
+│ Notifies:    [team_discord] on ERROR+                  │
+╰────────────────────────────────────────────────────────╯
+```
+
+### Best practices
+- **Read-only by default** — `inspect` ไม่แก้ state
+- **Trace IDs included** — link ไป recent call logs ได้
+- **PII redaction** — ถ้า memory มี sensitive content (§Privacy) → mask ใน display
+- **Composable** — `gang agent inspect <id> --json` → pipe ไป tools อื่น
+
+---
+
+## 📸 Agent Snapshot / Time-travel (รายละเอียด)
+
+### ปัญหา
+แก้ agent (เปลี่ยน role, แก้ trait, สอน skill ใหม่, เปลี่ยน profession) — แล้วเสียดาย อยาก rollback ทำไม่ได้ ต้องสร้างใหม่ = เสีย memory + conversation history
+
+ต่างจาก **Backup** (§Backup) ที่เป็นระดับระบบ — นี่คือระดับ **agent ตัวเดียว**, ขนาดเล็ก, fine-grained
+
+### หลักการ
+- **Snapshot = immutable** copy ของ agent state ณ จุดเวลา
+- **เก็บใน `./data/sqlite/agent_snapshots.db`** (ครอบโดย backup ของระบบอยู่แล้ว)
+- **Auto-snapshot** ก่อน destructive operation (เปลี่ยน profession, mass-delete skill, reset memory)
+- **Manual snapshot** เป็น checkpoint ("ก่อนสอน math advanced", "v1.0 release")
+
+### Data model
+
+```python
+class AgentSnapshot(BaseModel):
+    id: str
+    agent_id: str
+    tag: str | None                 # "before-teaching-advanced-math"
+    created_at: datetime
+    state: AgentState               # full serialized state
+    memory_ref: str | None          # ref ไป memory snapshot (vector + structured)
+    parent_snapshot: str | None     # genealogy
+    auto: bool                      # auto-created vs manual
+    size_bytes: int
+```
+
+### CLI
+
+```
+gang agent snapshot <id> [--tag x]      # create snapshot
+gang agent snapshots <id>               # list
+gang agent diff-snap <snap1> <snap2>    # diff
+gang agent restore <id> <snapshot>      # rollback (with confirm)
+gang agent restore <id> <snapshot> --new   # fork ออกเป็น agent ใหม่
+gang agent forget-snap <snapshot>       # delete (audit logged)
+```
+
+### Auto-snapshot triggers
+- ก่อนเปลี่ยน profession reference
+- ก่อน mass operation: delete >5 skills, reset memory, change >3 traits
+- ก่อน prompt binding migration (version bump)
+- ก่อน restore from backup (กัน user accidentally roll forward)
+
+### Best practices
+- **Memory dedup** — snapshot ใหม่อ้าง vector chunks เดิมถ้าไม่เปลี่ยน (content-hash refs)
+- **Retention policy** — auto-snapshot: keep last 10 + monthly 12 = ~22 ต่อ agent; manual: ไม่ลบ
+- **Diff รู้ context** — แสดง trait deltas + skill added/removed + role text diff (rich format)
+- **Restore ≠ destructive** — old state ถูก auto-snapshot ก่อน restore (กัน ผิดใจ)
+- **Conversation history**: snapshot ไม่ rollback conversation log (history คือความจริง — แค่ revert config)
 
 ---
 
