@@ -2,7 +2,7 @@
 
 > Multi-provider AI agent orchestration — ระบบควบคุม AI agent หลายค่าย (Claude / GPT / Gemini / ...) แบบ dynamic ที่ผู้ใช้สร้าง ตั้งชื่อ สอน และมอบหมายงานให้ agent ที่มีบุคลิกเฉพาะตัวได้
 
-**Status**: 🚧 Phase 0 — Foundation scaffold เสร็จ (Python project, `IAgentProvider`, Claude provider, CLI ทดสอบ chat)
+**Status**: 🚧 Phase 1 เสร็จ — 3 providers (Claude / OpenAI / Gemini), CapabilityRouter, Tool schema adapter, MCP integration (stdio + SSE), Schema migration runner
 
 📖 รายละเอียดการออกแบบทั้งหมดอยู่ใน [`plan.md`](./plan.md) — เป็น source of truth
 
@@ -24,7 +24,8 @@
 | Validation / config | Pydantic v2, pydantic-settings |
 | CLI | Typer + Rich |
 | Testing / Lint / Types | pytest, ruff, mypy (strict) |
-| Provider แรก | Anthropic Claude (SDK ทางการ) |
+| Providers | Anthropic Claude · OpenAI · Google Gemini (SDK ทางการทั้งหมด) |
+| MCP | `mcp` Python SDK (stdio + SSE transports) |
 
 ## เริ่มต้นใช้งาน
 
@@ -34,11 +35,25 @@ uv sync
 
 # 2) ตั้งค่า API key
 cp .env.example .env
-# แล้วใส่ ANTHROPIC_API_KEY ใน .env
+# ใส่อย่างน้อยหนึ่งใน: ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY
 
-# 3) ทดสอบ
-uv run gang providers           # ดู provider ที่ลงทะเบียน
-uv run gang ask "สวัสดี"        # one-shot chat ผ่าน Claude
+# 3) ทดสอบ chat
+uv run gang providers                  # ดู provider ที่ลงทะเบียน
+uv run gang ask "สวัสดี" -p claude     # หรือ -p openai / -p gemini
+uv run gang stream "เล่าให้ฟัง" -p openai
+
+# 4) Capability routing
+uv run gang capabilities               # provider × capability matrix
+uv run gang route -c vision -c tool_use --mode flexible --current claude
+
+# 5) Schema migration
+uv run gang db status
+uv run gang db migrate                 # apply 0001_initial.sql
+
+# 6) MCP servers (copy template, แก้ปรับ, แล้วลองเชื่อม)
+#    template: data/configs/mcp_servers.example.yaml
+uv run gang mcp list
+uv run gang mcp tools                  # discover tools across enabled servers
 ```
 
 ## โครงสถาปัตยกรรม
@@ -46,15 +61,27 @@ uv run gang ask "สวัสดี"        # one-shot chat ผ่าน Claude
 ```
 cli/  ──▶  ProviderRegistry  ──▶  IAgentProvider (Protocol)
                                         │
-                          @register_provider("claude")
-                              implementations/claude.py
+                          @register_provider("claude" | "openai" | "gemini")
+                              implementations/<name>.py
+
+CapabilityRouter ──▶ เลือก provider จาก capability ที่ต้องการ
+                     (strict | flexible mode; YAML config = data/configs/capabilities.yaml)
+
+tools.Tool ──▶ adapters.{to_anthropic, to_openai, to_gemini, bundle_for}
+                     ▲
+            MCP bridge: mcp.types.Tool → tools.Tool (1 path → 3 vendors)
+
+migrations.MigrationRunner ──▶ linear SQL files (NNNN_*.sql)
+                               tracking table + checksum drift detection
 ```
 
 หลักการที่ยึด:
 
-- **Capability Flag** — branch ตาม `provider.supports(Capability.X)` ไม่ใช่ตามชื่อค่าย
-- **Plug-in pattern** — เพิ่มค่ายใหม่ = สร้างไฟล์ใหม่ใน `providers/implementations/` + `@register_provider("...")` ไม่ต้องแก้โค้ดอื่น
+- **Capability Flag** — branch ตาม `provider.supports(Capability.X)` ไม่ใช่ตามชื่อค่าย; เพิ่ม capability ใหม่ของ vendor → declare ใน `capabilities.yaml` ไม่ต้องแก้โค้ด
+- **Plug-in pattern** — เพิ่มค่ายใหม่ = สร้างไฟล์ใน `providers/implementations/` + `@register_provider("...")` ไม่ต้องแก้โค้ดอื่น
 - **Provider-neutral domain** — `Message`/`Response`/`Role` ไม่ผูกกับ SDK ใด ค่ายต่างๆ แปลงเข้า/ออกเอง
+- **Tool ฯ One schema, three wires** — `Tool` กลางหนึ่งตัว, adapters แปลงเข้า Anthropic/OpenAI/Gemini; MCP tools ก็เข้าใน path เดียวกัน
+- **Config in `data/configs/`** — YAML + Pydantic validation + `${ENV_VAR}` interpolation (missing var → raises, ไม่ silent)
 - **Patterns**: Strategy (provider) + Adapter (format) + Registry (plug-in) + Capability composition
 
 ## Roadmap
@@ -62,7 +89,7 @@ cli/  ──▶  ProviderRegistry  ──▶  IAgentProvider (Protocol)
 | Phase | งาน | สถานะ |
 |-------|-----|------|
 | 0 | Project scaffold + Claude provider + CLI | ✅ |
-| 1 | OpenAI/Gemini + CapabilityRouter + Tool schema adapter + **MCP** + **Schema Migration** | ⏳ |
+| 1 | OpenAI/Gemini + CapabilityRouter + Tool schema adapter + **MCP** + **Schema Migration** | ✅ |
 | 2 | Agent lifecycle + Personality Engine (ชื่อ → นิสัย) + **Prompt Library/Versioning** | ⏳ |
 | 3 | Skill/Role + Memory + **RAG Pipeline** + **Backup (restic)** + **Profession Template** | ⏳ |
 | 4 | **Notification** (Telegram / Discord / Line / Email) + **Scheduled Tasks** | ⏳ |
