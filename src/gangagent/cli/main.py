@@ -11,6 +11,7 @@ from gangagent.capabilities import (
     NoMatchingProviderError,
     default_config_path,
 )
+from gangagent.cli.agents import agents_app
 from gangagent.cli.db import db_app
 from gangagent.cli.mcp import mcp_app
 from gangagent.config import load_settings
@@ -22,6 +23,7 @@ app = typer.Typer(
     help="gangAgent — multi-provider AI agent orchestration.",
     no_args_is_help=True,
 )
+app.add_typer(agents_app)
 app.add_typer(db_app)
 app.add_typer(mcp_app)
 console = Console()

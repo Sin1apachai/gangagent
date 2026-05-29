@@ -21,9 +21,7 @@ from gangagent.migrations import (
 
 def _write(dir: Path, version: str, name: str, up: str, down: str) -> Path:
     path = dir / f"{version}_{name}.sql"
-    path.write_text(
-        f"-- name: {name}\n-- version: {version}\n\n-- up\n{up}\n\n-- down\n{down}\n"
-    )
+    path.write_text(f"-- name: {name}\n-- version: {version}\n\n-- up\n{up}\n\n-- down\n{down}\n")
     return path
 
 
@@ -128,9 +126,7 @@ def test_rollback_to_specific_version(runner: MigrationRunner) -> None:
 
 
 def test_drift_blocks_migrate(runner: MigrationRunner) -> None:
-    path = _write(
-        runner.migrations_dir, "0001", "init", "CREATE TABLE t(id INT);", "DROP TABLE t;"
-    )
+    path = _write(runner.migrations_dir, "0001", "init", "CREATE TABLE t(id INT);", "DROP TABLE t;")
     _write(runner.migrations_dir, "0002", "next", "CREATE TABLE u(id INT);", "DROP TABLE u;")
     runner.migrate(to="0001")
 
@@ -170,7 +166,7 @@ def test_duplicate_versions_raise(runner: MigrationRunner) -> None:
 
 
 def test_bundled_initial_migration_roundtrips(tmp_path: Path) -> None:
-    """The 0001_initial.sql we ship must round-trip cleanly — this is the Phase 1 DoD gate."""
+    """The bundled migrations must round-trip cleanly — Phase 1 DoD gate."""
     runner = MigrationRunner(db_path=tmp_path / "live.db", migrations_dir=default_migrations_dir())
     runner.migrate()
     with sqlite3.connect(runner.db_path) as conn:
@@ -179,7 +175,8 @@ def test_bundled_initial_migration_roundtrips(tmp_path: Path) -> None:
         }
     assert "agents" in tables
 
-    runner.rollback()
+    # Roll all the way back (versions are exclusive in rollback; "0000" undoes everything).
+    runner.rollback(to="0000")
     with sqlite3.connect(runner.db_path) as conn:
         tables = {
             row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
