@@ -1,0 +1,1 @@
+CREATE TABLE knowledge_embeddings(note_id uuid PRIMARY KEY REFERENCES knowledge(id),content_hash text NOT NULL,model text NOT NULL,vector double precision[] NOT NULL CHECK(cardinality(vector)=384),updated_at timestamptz NOT NULL DEFAULT now());

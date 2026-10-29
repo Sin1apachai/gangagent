@@ -1,0 +1,49 @@
+# Separate project and ephemeral databases. Never points tests at the working office.
+services:
+  app:
+    image: agent-office-local:latest
+    ports: !reset []
+    environment:
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
+      EMBEDDING_ADDR: ""
+    restart: "no"
+  postgres:
+    environment:
+      POSTGRES_DB: office_test
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U office -d office_test"]
+    volumes: !reset []
+    tmpfs: [/var/lib/postgresql/data]
+    restart: "no"
+  redis:
+    volumes: !reset []
+    tmpfs: [/data]
+    restart: "no"
+  worker:
+    image: agent-office-local:latest
+    build: {context: ., target: runtime}
+    environment:
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
+      WORKER_MODE: fixture
+      ALLOW_TEST_WORKER: "1"
+    volumes: !override [runs-data:/data]
+    restart: "no"
+  tests:
+    depends_on:
+      worker: {condition: service_started}
+      worker-two: {condition: service_started}
+  worker-two:
+    image: agent-office-local:latest
+    user: "0:0"
+    command: [/app/agent-office, --worker]
+    environment:
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
+      OWNER_EMAIL: ${OWNER_EMAIL}
+      WORKER_ID: test-worker-two
+      WORKER_MODE: fixture
+      ALLOW_TEST_WORKER: "1"
+    volumes: [runs-data:/data]
+    depends_on:
+      app: {condition: service_started}
+      postgres: {condition: service_healthy}
+    restart: "no"

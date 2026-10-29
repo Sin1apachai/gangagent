@@ -1,0 +1,109 @@
+export type Furniture = {
+  id: string;
+  kind: string;
+  x: number;
+  y: number;
+  rotation: number;
+};
+export type Agent = {
+  id: string;
+  name: string;
+  role: string;
+  instructions: string;
+  provider: string;
+  x: number;
+  y: number;
+  enabled: boolean;
+  version: number;
+};
+export type Task = {
+  project_id?: string | null;
+  priority?: string;
+  acceptance_criteria?: string;
+  plan_id?: string | null;
+  id: string;
+  title: string;
+  description: string;
+  provider: string;
+  agent_id: string | null;
+  status: string;
+  version: number;
+  attempts: number;
+  execution_requested: boolean;
+  cancel_requested: boolean;
+  created_by: string;
+  result: string;
+  error: string;
+  review_feedback: string;
+  created_at: string;
+};
+export type Note = {
+  id: string;
+  title: string;
+  content: string;
+  source: string;
+  verified: boolean;
+  version: number;
+};
+export type Workspace = {
+  id: string;
+  name: string;
+  role: string;
+  version: number;
+};
+export type Snapshot = {
+  id: string;
+  name: string;
+  version: number;
+  layout: { items: Furniture[] };
+  layout_version: number;
+  tasks: Task[];
+  knowledge: Note[];
+  agents: Agent[];
+};
+export type User = {
+  intelligence_access?: boolean;
+  id: string;
+  name: string;
+  email: string;
+  is_super_admin: boolean;
+  deleted_at?: string | null;
+};
+export type Detail = {
+  task: Task;
+  events: { id: number; message: string; created_at: string }[];
+  runs: {
+    id: string;
+    status: string;
+    result: string;
+    error: string;
+    started_at: string;
+  }[];
+  artifacts: { id: string; run_id: string; name: string; size: number }[];
+};
+export type ProviderLogin = {
+  id: string;
+  provider: string;
+  status: string;
+  login_url: string;
+  device_code: string;
+  message: string;
+  expires_at: string;
+};
+export type Connections = {
+  logins: ProviderLogin[];
+  settings: {
+    provider: string;
+    enabled: boolean;
+    billing_acknowledged: boolean;
+  }[];
+  workers: {
+    id: string;
+    mode: string;
+    online: boolean;
+    heartbeat_at: string;
+    providers: Record<string, { authenticated: boolean; method: string }>;
+  }[];
+  billing_notice: string;
+};
+export type Modal = { kind: string; value?: any };

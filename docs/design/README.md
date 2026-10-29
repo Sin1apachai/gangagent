@@ -1,0 +1,1 @@
+Design reference: /Users/hall/Downloads/Agent Office.html. Sprite sheets and embedded font extracted from the supplied designer export. No prototype demo records are imported. Original font license is SIL Open Font License.
