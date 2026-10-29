@@ -98,14 +98,14 @@ async fn invalidate_execution(
         .bind(wid).bind(uid).bind(provider).execute(&mut **tx).await?;
     Ok(())
 }
-async fn owner(a: &App, u: &User, wid: Uuid) -> Result<()> {
+pub(crate) async fn owner(a: &App, u: &User, wid: Uuid) -> Result<()> {
     let yes:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM memberships WHERE workspace_id=$1 AND user_id=$2 AND role='owner')").bind(wid).bind(u.id).fetch_one(&a.db).await?;
     if !u.is_super_admin && !yes {
         return Err(Error(StatusCode::FORBIDDEN, "Workspace owner required"));
     }
     Ok(())
 }
-fn changed(n: u64) -> Result<Json<Value>> {
+pub(crate) fn changed(n: u64) -> Result<Json<Value>> {
     if n == 0 {
         Err(Error(
             StatusCode::CONFLICT,

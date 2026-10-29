@@ -3,7 +3,7 @@ WORKDIR /web
 COPY web/package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 COPY web/ ./
-RUN npm run build
+RUN npm run build && npm test
 
 FROM rust:1.92-bookworm AS rust-build
 WORKDIR /build

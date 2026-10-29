@@ -38,7 +38,10 @@ function TaskCard({ task, ctx }: { task: Task; ctx: OfficeController }) {
           : "เปิดงาน";
   const open = () => ctx.run(() => ctx.showTask(task));
   const editable =
-    ctx.canWrite && task.status !== "running" && !task.execution_requested;
+    ctx.canWrite &&
+    !task.workflow_step &&
+    task.status !== "running" &&
+    !task.execution_requested;
   return (
     <article className={`task-card board-card state-${task.status}`}>
       <div className="board-card-labels">

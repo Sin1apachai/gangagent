@@ -1,3 +1,5 @@
+import { StepEditor } from "../organization/StepEditor";
+import type { Skill, Organization, Reviewer } from "../organization/types";
 import React, { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import type { OfficeController } from "../../application/useOfficeController";
@@ -9,12 +11,7 @@ type Project = {
   version: number;
   deleted_at: string | null;
 };
-type Step = {
-  title: string;
-  description: string;
-  agent_id: string;
-  depends_on: number[];
-};
+import type { Step } from "../organization/types";
 type Plan = {
   id: string;
   goal: string;
@@ -23,6 +20,7 @@ type Plan = {
   version: number;
   planner_task_id: string | null;
   created_by: string;
+  workflow_snapshot?: { title: string; version: number } | null;
 };
 export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
   const { wid, data, page, user, canWrite, run, busy, after, showTask } = ctx;
@@ -30,6 +28,12 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
     [plans, setPlans] = useState<Plan[]>([]),
     [drafts, setDrafts] = useState<Record<string, Step[]>>({}),
     [approved, setApproved] = useState<Record<string, boolean>>({});
+  const [skills, setSkills] = useState<Skill[]>([]),
+    [organization, setOrganization] = useState<Organization>({
+      agents: [],
+      bindings: [],
+    }),
+    [reviewers, setReviewers] = useState<Reviewer[]>([]);
   async function load() {
     if (!wid) return;
     const [p, l] = await Promise.all([
@@ -40,10 +44,28 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
     setPlans(l);
   }
   useEffect(() => {
+    if (!wid || !["projects", "plans"].includes(page)) return;
+    let current = true;
+    Promise.all([
+      api<Skill[]>(`/workspaces/${wid}/skills`),
+      api<Organization>(`/workspaces/${wid}/organization`),
+      api<Reviewer[]>(`/workspaces/${wid}/reviewers`),
+    ])
+      .then(([s, o, r]) => {
+        if (current) {
+          setSkills(s);
+          setOrganization(o);
+          setReviewers(r);
+        }
+      })
+      .catch((e) => ctx.setError(String(e)));
     load().catch(() => {});
     const t = setInterval(() => load().catch(() => {}), 3000);
-    return () => clearInterval(t);
-  }, [wid]);
+    return () => {
+      current = false;
+      clearInterval(t);
+    };
+  }, [wid, page]);
   if (!wid || !data || !user || !["projects", "plans"].includes(page))
     return null;
   const agents = data.agents.filter((a) => a.enabled);
@@ -249,130 +271,54 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                     )}
                   </div>
                 )}
-                <ol className="plan-steps">
-                  {steps.map((s, index) => (
-                    <li key={index}>
-                      <label>
-                        งานที่ {index + 1}
-                        <input
-                          value={s.title}
-                          disabled={!editable}
-                          maxLength={200}
-                          onChange={(e) =>
-                            edit(
-                              p.id,
-                              steps.map((v, n) =>
-                                n === index
-                                  ? { ...v, title: e.target.value }
-                                  : v,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                      <label>
-                        รายละเอียด / เกณฑ์ตรวจรับ
-                        <textarea
-                          value={s.description}
-                          disabled={!editable}
-                          onChange={(e) =>
-                            edit(
-                              p.id,
-                              steps.map((v, n) =>
-                                n === index
-                                  ? { ...v, description: e.target.value }
-                                  : v,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                      <label>
-                        ผู้รับผิดชอบ
-                        <select
-                          value={s.agent_id}
-                          disabled={!editable}
-                          onChange={(e) =>
-                            edit(
-                              p.id,
-                              steps.map((v, n) =>
-                                n === index
-                                  ? { ...v, agent_id: e.target.value }
-                                  : v,
-                              ),
-                            )
-                          }
-                        >
-                          <option value="">เลือก Agent</option>
-                          {agents.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name} · {a.provider}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {index > 0 && (
-                        <fieldset>
-                          <legend>รอผลตรวจรับจากงาน</legend>
-                          {steps.slice(0, index).map((prior, n) => (
-                            <label className="check" key={n}>
-                              <input
-                                type="checkbox"
-                                checked={s.depends_on.includes(n)}
-                                disabled={!editable}
-                                onChange={(e) =>
-                                  edit(
-                                    p.id,
-                                    steps.map((v, i) =>
-                                      i === index
-                                        ? {
-                                            ...v,
-                                            depends_on: e.target.checked
-                                              ? [...v.depends_on, n]
-                                              : v.depends_on.filter(
-                                                  (x) => x !== n,
-                                                ),
-                                          }
-                                        : v,
-                                    ),
-                                  )
-                                }
-                              />
-                              {n + 1}. {prior.title || "ยังไม่ตั้งชื่อ"}
-                            </label>
-                          ))}
-                        </fieldset>
-                      )}
-                    </li>
-                  ))}
-                </ol>
+                {p.workflow_snapshot && (
+                  <p className="notice">
+                    Workflow: {p.workflow_snapshot.title} · v
+                    {p.workflow_snapshot.version + 1} ·
+                    แผนนี้เก็บสำเนาแม่แบบไว้แล้ว
+                  </p>
+                )}
+                {editable ? (
+                  <StepEditor
+                    steps={steps}
+                    onChange={(next) => edit(p.id, next)}
+                    agents={agents}
+                    skills={skills}
+                    bindings={organization.bindings}
+                    reviewers={reviewers}
+                    disabled={busy}
+                  />
+                ) : (
+                  <ol className="workflow-map" aria-label="ขั้นตอนในแผน">
+                    {steps.map((step, i) => (
+                      <li key={i}>
+                        <b>
+                          {i + 1}. {step.title}
+                        </b>
+                        <small>
+                          {agents.find((a) => a.id === step.agent_id)?.name ||
+                            "Agent ไม่พร้อม"}{" "}
+                          ·{" "}
+                          {step.depends_on.length
+                            ? `รอขั้น ${step.depends_on.map((d) => d + 1).join(", ")}`
+                            : "เริ่มต้น"}
+                        </small>
+                        <details>
+                          <summary>ข้อตกลงส่งมอบ</summary>
+                          <p>{step.description}</p>
+                          <p>ผลงาน: {step.output_contract || "—"}</p>
+                          <p>เกณฑ์ตรวจรับ: {step.acceptance_criteria || "—"}</p>
+                          <p>
+                            ไฟล์บังคับ: {step.required_files?.join(", ") || "—"}
+                          </p>
+                        </details>
+                      </li>
+                    ))}
+                  </ol>
+                )}
                 {editable && (
                   <>
                     <div className="actions">
-                      <button
-                        disabled={busy || steps.length >= 8}
-                        onClick={() =>
-                          edit(p.id, [
-                            ...steps,
-                            {
-                              title: "",
-                              description: "",
-                              agent_id: agents[0]?.id ?? "",
-                              depends_on: steps.length
-                                ? [steps.length - 1]
-                                : [],
-                            },
-                          ])
-                        }
-                      >
-                        เพิ่มขั้นตอน (สูงสุด 8)
-                      </button>
-                      <button
-                        disabled={busy || !steps.length}
-                        onClick={() => edit(p.id, steps.slice(0, -1))}
-                      >
-                        ลบขั้นตอนสุดท้าย
-                      </button>
                       <button
                         disabled={busy || !steps.length}
                         onClick={() =>

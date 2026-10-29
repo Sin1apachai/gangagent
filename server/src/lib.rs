@@ -4,6 +4,7 @@ mod auth;
 mod collaboration;
 mod domain;
 mod infrastructure;
+mod organization;
 mod personal_workers;
 mod workspaces;
 use admin::*;
@@ -131,6 +132,7 @@ pub async fn run() {
             phase2::routes()
                 .merge(provider_login::routes())
                 .merge(collaboration::routes())
+                .merge(organization::routes())
                 .merge(personal_workers::routes()),
         )
         .fallback(|| async { Error(StatusCode::NOT_FOUND, "API route not found") })

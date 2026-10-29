@@ -1,3 +1,4 @@
+import { OrganizationPage } from "./features/organization/OrganizationPage";
 import { CollaborationPage } from "./features/collaboration/CollaborationPage";
 import { TaskDetail } from "./features/tasks/TaskDetail";
 import { EntityModal } from "./features/forms/EntityModal";
@@ -174,6 +175,9 @@ export default function App() {
             ["plans", "♜", "แผนทีม"],
             ["knowledge", "▤", "Knowledge"],
             ["team", "♧", "Team"],
+            ["skills", "✦", "Skills"],
+            ["organization", "♙", "โครงสร้างทีม"],
+            ["workflows", "⇢", "Workflow"],
             ["settings", "⚙", "Settings"],
             ["trash", "♲", "Trash"],
           ].map(([id, icon, label]) => (
@@ -267,6 +271,9 @@ export default function App() {
                       tasks: "กระดานงาน",
                       knowledge: "คลังความรู้",
                       team: "ทีม Agent",
+                      skills: "คลัง Skill ของทีม",
+                      organization: "โครงสร้างและบทบาทของทีม",
+                      workflows: "กระบวนการทำงานของทีม",
                       settings: "ตั้งค่าสำนักงานของคุณ",
                       projects: "จัดโปรเจกต์ของทีม",
                       plans: "วางแผนก่อนลงมือทำ",
@@ -284,6 +291,10 @@ export default function App() {
                       knowledge:
                         "รวบรวมสิ่งที่ทีมรู้ พร้อมค้นหาและตรวจสอบแหล่งที่มา",
                       team: "กำหนดบทบาทและเครื่องมือให้สมาชิกแต่ละคน",
+                      skills: "สร้างความเชี่ยวชาญที่ใช้ซ้ำและเก็บประวัติได้",
+                      organization:
+                        "เห็นสายรายงาน หน้าที่ และขอบเขตของแต่ละ Agent",
+                      workflows: "กำหนดลำดับส่งงานและจุดตรวจรับอย่างชัดเจน",
                       settings: "จัดการบัญชี การเชื่อมต่อ และสิทธิ์ของทีม",
                       projects: "จัดกลุ่มงานให้เห็นเป้าหมายและความคืบหน้า",
                       plans: "ตรวจแผนและลำดับงานก่อนอนุมัติให้ทีมเริ่มทำ",
@@ -346,6 +357,7 @@ export default function App() {
           <TasksPage ctx={controller} />
           <KnowledgePage ctx={controller} />
           <TeamPage ctx={controller} />
+          <OrganizationPage ctx={controller} />
           <SettingsPage ctx={controller} />
           <TrashPage ctx={controller} />
         </div>

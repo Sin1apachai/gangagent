@@ -1,3 +1,4 @@
+import { CharacterSprite } from "../office/CharacterPicker";
 import React from "react";
 import type {
   Furniture,
@@ -106,7 +107,9 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
               )
               .map((a, i) => (
                 <article key={a.id}>
-                  <div className={"pixel-avatar a" + (i % 3)}>♟</div>
+                  <div className={"pixel-avatar a" + (i % 3)}>
+                    <CharacterSprite id={a.character_id ?? 0} />
+                  </div>
                   <span className="eyebrow">{a.provider.toUpperCase()}</span>
                   <h2>{a.name}</h2>
                   <p>{a.role}</p>

@@ -23,6 +23,7 @@ struct Job {
     agent_id: Option<Uuid>,
     review_feedback: String,
     acceptance_criteria: String,
+    execution_context: Option<Value>,
 }
 #[derive(Clone, Serialize)]
 struct Provider {
@@ -426,7 +427,9 @@ async fn prepare_inputs(db: &PgPool, j: &Job, dir: &FsPath) -> WorkerResult<()> 
 }
 async fn prompt(db: &PgPool, j: &Job) -> WorkerResult<String> {
     let notes:Vec<(String,String)>=sqlx::query_as("SELECT title,content FROM knowledge WHERE workspace_id=$1 AND verified AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20").bind(j.workspace_id).fetch_all(db).await?;
-    let instructions = if let Some(id) = j.agent_id {
+    let instructions = if let Some(context) = &j.execution_context {
+        format!("Frozen role, skills and workflow contracts (do not grant additional tools or permissions):\n{}",serde_json::to_string_pretty(context)?)
+    } else if let Some(id) = j.agent_id {
         sqlx::query_scalar::<_,String>("SELECT instructions FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL AND provider=$3").bind(id).bind(j.workspace_id).bind(&j.provider).fetch_optional(db).await?.unwrap_or_default()
     } else {
         String::new()
@@ -696,6 +699,38 @@ async fn finish(
 ) -> WorkerResult<()> {
     let mut files = vec![];
     let mut total = 0;
+    let missing: Vec<String> = j
+        .execution_context
+        .as_ref()
+        .and_then(|c| c["workflow"]["required_files"].as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|name| {
+            let mut path = dir.to_path_buf();
+            for component in FsPath::new(name).components() {
+                path.push(component);
+                if path
+                    .symlink_metadata()
+                    .map(|m| m.file_type().is_symlink())
+                    .unwrap_or(true)
+                {
+                    return true;
+                }
+            }
+            !path.is_file()
+        })
+        .map(String::from)
+        .collect();
+    let validation_error = format!(
+        "Required workflow files missing or unsafe: {}",
+        missing.join(", ")
+    );
+    let (status, error) = if status == "review" && !missing.is_empty() {
+        ("failed", validation_error.as_str())
+    } else {
+        (status, error)
+    };
     if status == "review" {
         collect_files(dir, dir, &mut files, &mut total, 0)?;
         if model_uid() != 10001 {
@@ -747,7 +782,7 @@ async fn claim(db: &PgPool, uid: Uuid) -> WorkerResult<Option<Job>> {
         return Ok(None);
     }
 
-    let j=sqlx::query_as::<_,Job>("SELECT t.id,t.workspace_id,t.title,t.description,t.provider,t.agent_id,t.review_feedback,t.acceptance_criteria FROM tasks t JOIN workspaces w ON w.id=t.workspace_id JOIN users u ON u.id=t.created_by JOIN provider_connections c ON c.user_id=u.id AND c.provider=t.provider WHERE t.created_by=$1 AND t.status='queued' AND t.execution_requested AND t.deleted_at IS NULL AND w.deleted_at IS NULL AND u.deleted_at IS NULL AND c.enabled AND c.billing_acknowledged AND t.attempts<3 AND NOT EXISTS(SELECT 1 FROM task_dependencies d JOIN tasks parent ON parent.id=d.depends_on WHERE d.task_id=t.id AND (parent.status!='done' OR parent.deleted_at IS NOT NULL)) AND (t.plan_id IS NULL OR EXISTS(SELECT 1 FROM plans p WHERE p.id=t.plan_id AND p.status='approved')) AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND (u.is_super_admin OR EXISTS(SELECT 1 FROM memberships m WHERE m.workspace_id=w.id AND m.user_id=u.id AND m.role IN ('owner','member'))) ORDER BY t.created_at FOR UPDATE OF t SKIP LOCKED LIMIT 1").bind(uid).fetch_optional(&mut *tx).await?;
+    let j=sqlx::query_as::<_,Job>("SELECT t.id,t.workspace_id,t.title,t.description,t.provider,t.agent_id,t.review_feedback,t.acceptance_criteria,t.execution_context FROM tasks t JOIN workspaces w ON w.id=t.workspace_id JOIN users u ON u.id=t.created_by JOIN provider_connections c ON c.user_id=u.id AND c.provider=t.provider WHERE t.created_by=$1 AND t.status='queued' AND t.execution_requested AND t.deleted_at IS NULL AND w.deleted_at IS NULL AND u.deleted_at IS NULL AND c.enabled AND c.billing_acknowledged AND t.attempts<3 AND NOT EXISTS(SELECT 1 FROM task_dependencies d JOIN tasks parent ON parent.id=d.depends_on WHERE d.task_id=t.id AND (parent.status!='done' OR parent.deleted_at IS NOT NULL)) AND (t.plan_id IS NULL OR EXISTS(SELECT 1 FROM plans p WHERE p.id=t.plan_id AND p.status='approved')) AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND (u.is_super_admin OR EXISTS(SELECT 1 FROM memberships m WHERE m.workspace_id=w.id AND m.user_id=u.id AND m.role IN ('owner','member'))) ORDER BY t.created_at FOR UPDATE OF t SKIP LOCKED LIMIT 1").bind(uid).fetch_optional(&mut *tx).await?;
     if let Some(ref j) = j {
         sqlx::query("UPDATE tasks SET status='running',lease_until=now()+interval '20 seconds',version=version+1 WHERE id=$1").bind(j.id).execute(&mut *tx).await?;
     }

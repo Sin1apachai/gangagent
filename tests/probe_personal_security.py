@@ -21,6 +21,8 @@ def psql(sql):
  return r.returncode,r.stdout.strip(),r.stderr
 assert psql('SELECT count(*) FROM knowledge')[1]=='1'
 assert psql("SELECT count(*) FROM knowledge WHERE title='FORBIDDEN PRIVATE NOTE'")[1]=='0'
+for table in ('skills','skill_versions','agent_skills','workflows','workflow_versions','workflow_launches'):
+ assert psql('SELECT count(*) FROM '+table)[0]!=0
 assert psql('SELECT password_hash FROM users')[0]!=0
 assert psql('SET ROLE office')[0]!=0
 assert psql('UPDATE memberships SET role=\'owner\'')[0]!=0
@@ -62,7 +64,10 @@ try:
   time.sleep(1)
  else:raise AssertionError('Fixture worker unavailable')
  assert call(member,'/connections/codex' ,{'enabled':True,'billing_acknowledged':True},'PUT')[0]==200
- tid=call(member,f'/workspaces/{wid}/tasks',{'title':'Personal worker actual acceptance','description':'Return fixture output','provider':'codex','agent_id':None})[1]['id']
+ aid=call(member,f'/workspaces/{wid}/agents',{'name':'Personal Skill Agent','role':'Builder','instructions':'Follow assigned skills','provider':'codex','enabled':True,'x':4,'y':4})[1]['id']
+ sid=call(member,f'/workspaces/{wid}/skills',{'title':'Personal playbook','instructions':'PERSONAL_SKILL_CONTEXT'})[1]['id']
+ assert call(member,f'/workspaces/{wid}/agents/{aid}/organization',{'version':0,'manager_id':None,'skills':[{'skill_id':sid,'pinned_version':0}]},'PUT')[0]==200
+ tid=call(member,f'/workspaces/{wid}/tasks' ,{'title':'Personal worker actual acceptance','description':'Return fixture output','provider':'codex','agent_id':aid})[1]['id']
  taskpath=f'/workspaces/{wid}/tasks/{tid}'
  assert call(member,taskpath+'/run',{'billing_acknowledged':True})[0]==200
  for _ in range(80):
@@ -72,6 +77,8 @@ try:
  else:
   logs=subprocess.run(cmd+['logs','--tail','15'],capture_output=True,text=True).stdout
   print(logs.replace(pw,'[REDACTED]'));raise AssertionError('Personal task did not finish: '+d['task']['status'])
+ assert 'PERSONAL_SKILL_CONTEXT' in d['task']['result']
+ assert d['task']['execution_context']['skills'][0]['version']==0
  assert d['artifacts'];url=d['artifacts'][0]
  # The web app must read a file created under the personal model UID.
  runid=d['task']['current_run_id']
@@ -81,7 +88,7 @@ try:
  result=subprocess.run(['docker','exec',prefix+'-app-1','test','-r',f'/data/runs/{runid}/'+names[0]],capture_output=True)
  assert result.returncode==0
  assert psql(f"SELECT count(*) FROM tasks WHERE workspace_id='{foreign}'")[1]=='0'
- print('PASS Personal worker: own task executed once with separate UID; web app reads artifact through ACL',flush=True)
+ print('PASS Personal worker: frozen Skill executed once with separate UID; library tables denied; web app reads artifact through ACL',flush=True)
  assert call(member,'/personal-workers/'+b['id'],method='DELETE')[0]==200
  assert psql('SELECT 1')[0]!=0
  assert ('WRONGPASS' in rcli('PING') or 'NOAUTH' in rcli('PING'))

@@ -1,3 +1,4 @@
+import { drawCharacter } from "./characters";
 import React, { useEffect, useRef, useState } from "react";
 import type { Furniture, Agent, Task } from "../../shared/types";
 import { LayoutEngine, catalog, type Cell } from "./domain/LayoutEngine";
@@ -255,12 +256,20 @@ export function Office({
           }
           const x = Math.round(32 + p.x * 32),
             y = Math.round(64 + p.y * 32);
-          const skin = index % 3,
+          const skin = Math.floor((agent.character_id ?? (index % 3) * 4) / 4),
             dir = moving ? Math.floor(now / 180) % 3 : 0;
           const sx = skin * 48 + dir * 16,
             sy = working && !moving ? 40 : 0;
           if (atlas.characters.complete && atlas.characters.naturalWidth)
-            c.drawImage(atlas.characters, sx, sy, 16, 20, x, y - 10, 32, 40);
+            drawCharacter(
+              c,
+              atlas.characters,
+              x,
+              y,
+              agent.character_id ?? (index % 3) * 4,
+              dir,
+              sy,
+            );
           const label =
             agent.name +
             " · " +

@@ -27,12 +27,15 @@ pub(crate) async fn trash_entity(
         ""
     };
     let sql=format!("UPDATE {table} SET deleted_at={state},version=version+1{reset} WHERE id=$1 AND workspace_id=$2 AND deleted_at {filter}{extra}");
+    let mut tx = a.db.begin().await?;
+    organization::lock_workspace(&mut tx, wid).await?;
     let n = sqlx::query(&sql)
         .bind(id)
         .bind(wid)
-        .execute(&a.db)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
+    tx.commit().await?;
     audit(
         a,
         u,

@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { FormTabs } from "../../shared/FormTabs";
+import { CharacterPicker } from "../office/CharacterPicker";
 import type {
   Furniture,
   Agent,
@@ -87,12 +89,30 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
         .then(setProjects)
         .catch(() => {});
   }, [wid, modal?.kind]);
+  const [agentTab, setAgentTab] = useState("profile"),
+    [character, setCharacter] = useState(0);
+  useEffect(() => {
+    setAgentTab("profile");
+    setCharacter(modal?.value?.character_id ?? 0);
+  }, [modal?.kind, modal?.value?.id]);
   if (!user) return null;
   return (
     <>
       {modal && (
         <div className="overlay">
           <form
+            onInvalidCapture={(e) => {
+              if (modal?.kind === "agent") {
+                const target = e.target as HTMLInputElement;
+                const name = target.name;
+                setAgentTab(
+                  ["x", "y", "instructions"].includes(name)
+                    ? "instructions"
+                    : "profile",
+                );
+                requestAnimationFrame(() => target.focus());
+              }
+            }}
             className="modal"
             onSubmit={(e) => {
               e.preventDefault();
@@ -149,6 +169,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                   body.x = Number(f.x);
                   body.y = Number(f.y);
                   body.enabled = f.enabled === "on";
+                  body.character_id = character;
                   if (v?.id) {
                     method = "PUT";
                     body.version = v.version;
@@ -343,59 +364,92 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                 )}
                 {modal.kind === "agent" && (
                   <>
-                    <Field
-                      label="ชื่อ Agent"
-                      name="name"
-                      value={modal.value?.name}
-                      required
-                      maxLength={100}
+                    <FormTabs
+                      label="ตั้งค่า Agent"
+                      value={agentTab}
+                      onChange={setAgentTab}
+                      tabs={[
+                        { id: "profile", label: "ข้อมูลทั่วไป" },
+                        { id: "appearance", label: "ตัวละคร" },
+                        { id: "instructions", label: "คำสั่งและตำแหน่ง" },
+                      ]}
                     />
-                    <Field
-                      label="บทบาท"
-                      name="role"
-                      value={modal.value?.role}
-                      required
-                      maxLength={200}
-                    />
-                    <Area
-                      label="คำสั่งประจำตัว"
-                      name="instructions"
-                      value={modal.value?.instructions}
-                    />
-                    <label>
-                      เครื่องมือ
-                      <select
-                        name="provider"
-                        defaultValue={modal.value?.provider ?? "codex"}
-                      >
-                        <option value="codex">Codex</option>
-                        <option value="claude">Claude</option>
-                      </select>
-                    </label>
-                    <div className="coordinate-fields">
+                    <div
+                      role="tabpanel"
+                      aria-label="ข้อมูลทั่วไป"
+                      hidden={agentTab !== "profile"}
+                    >
                       <Field
-                        label="ตำแหน่ง X (0–19)"
-                        name="x"
-                        type="number"
-                        value={modal.value?.x ?? 2}
+                        label="ชื่อ Agent"
+                        name="name"
+                        value={modal.value?.name}
                         required
+                        maxLength={100}
                       />
                       <Field
-                        label="ตำแหน่ง Y (0–11)"
-                        name="y"
-                        type="number"
-                        value={modal.value?.y ?? 3}
+                        label="บทบาท"
+                        name="role"
+                        value={modal.value?.role}
                         required
+                        maxLength={200}
+                      />
+                      <label>
+                        เครื่องมือ
+                        <select
+                          name="provider"
+                          defaultValue={modal.value?.provider ?? "codex"}
+                        >
+                          <option value="codex">Codex</option>
+                          <option value="claude">Claude</option>
+                        </select>
+                      </label>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          name="enabled"
+                          defaultChecked={modal.value?.enabled ?? true}
+                        />
+                        เปิดใช้งาน Agent
+                      </label>
+                    </div>
+                    <div
+                      role="tabpanel"
+                      aria-label="ตัวละคร"
+                      hidden={agentTab !== "appearance"}
+                    >
+                      <CharacterPicker
+                        value={character}
+                        onChange={setCharacter}
                       />
                     </div>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        name="enabled"
-                        defaultChecked={modal.value?.enabled ?? true}
+                    <div
+                      role="tabpanel"
+                      aria-label="คำสั่งและตำแหน่ง"
+                      hidden={agentTab !== "instructions"}
+                    >
+                      {" "}
+                      <Area
+                        label="คำสั่งประจำตัว"
+                        name="instructions"
+                        value={modal.value?.instructions}
                       />
-                      เปิดใช้งาน Agent
-                    </label>
+                      <div className="coordinate-fields">
+                        <Field
+                          label="ตำแหน่ง X (0–19)"
+                          name="x"
+                          type="number"
+                          value={modal.value?.x ?? 2}
+                          required
+                        />
+                        <Field
+                          label="ตำแหน่ง Y (0–11)"
+                          name="y"
+                          type="number"
+                          value={modal.value?.y ?? 3}
+                          required
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
                 {["profile", "user"].includes(modal.kind) && (

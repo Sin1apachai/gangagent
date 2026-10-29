@@ -6,6 +6,11 @@ export type Furniture = {
   rotation: number;
 };
 export type Agent = {
+  character_id?: number;
+  manager_id?: string | null;
+  department?: string;
+  responsibilities?: string;
+  decision_scope?: string;
   id: string;
   name: string;
   role: string;
@@ -17,6 +22,20 @@ export type Agent = {
   version: number;
 };
 export type Task = {
+  execution_context?: {
+    agent: Agent | null;
+    skills: {
+      title: string;
+      version: number;
+      instructions: string;
+      input_contract: string;
+      output_contract: string;
+      acceptance_criteria: string;
+    }[];
+    workflow: import("../features/organization/types").Step | null;
+  } | null;
+  reviewer_id?: string | null;
+  workflow_step?: import("../features/organization/types").Step | null;
   project_id?: string | null;
   priority?: string;
   acceptance_criteria?: string;

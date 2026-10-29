@@ -9,9 +9,12 @@ pub(crate) struct AgentForm {
     y: i32,
     enabled: bool,
     version: Option<i32>,
+    #[serde(default)]
+    character_id: Option<i32>,
 }
 pub(crate) fn check_agent(b: &AgentForm) -> Result<()> {
-    if !valid(&b.name, 100)
+    if b.character_id.is_some_and(|c| !(0..12).contains(&c))
+        || !valid(&b.name, 100)
         || !valid(&b.role, 200)
         || b.instructions.len() > 20000
         || !matches!(b.provider.as_str(), "codex" | "claude")
@@ -42,7 +45,7 @@ pub(crate) async fn create_agent(
     access(&a, &u, wid, true).await?;
     check_agent(&b)?;
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO agents(id,workspace_id,name,role,instructions,provider,x,y,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)").bind(id).bind(wid).bind(b.name).bind(b.role).bind(b.instructions).bind(b.provider).bind(b.x).bind(b.y).bind(b.enabled).execute(&a.db).await?;
+    sqlx::query("INSERT INTO agents(id,workspace_id,name,role,instructions,provider,x,y,enabled,character_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").bind(id).bind(wid).bind(b.name).bind(b.role).bind(b.instructions).bind(b.provider).bind(b.x).bind(b.y).bind(b.enabled).bind(b.character_id.unwrap_or(0)).execute(&a.db).await?;
     audit(&a, &u, Some(wid), "agent.created").await?;
     Ok(Json(json!({"id":id})))
 }
@@ -55,7 +58,10 @@ pub(crate) async fn edit_agent(
     let u = user(&a, &h).await?;
     access(&a, &u, wid, true).await?;
     check_agent(&b)?;
-    let n=sqlx::query("UPDATE agents SET name=$1,role=$2,instructions=$3,provider=$4,x=$5,y=$6,enabled=$7,version=version+1 WHERE id=$8 AND workspace_id=$9 AND version=$10 AND deleted_at IS NULL").bind(b.name).bind(b.role).bind(b.instructions).bind(b.provider).bind(b.x).bind(b.y).bind(b.enabled).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).execute(&a.db).await?.rows_affected();
+    let mut tx = a.db.begin().await?;
+    organization::lock_workspace(&mut tx, wid).await?;
+    let n=sqlx::query("UPDATE agents SET name=$1,role=$2,instructions=$3,provider=$4,x=$5,y=$6,enabled=$7,character_id=coalesce($11,character_id),version=version+1 WHERE id=$8 AND workspace_id=$9 AND version=$10 AND deleted_at IS NULL").bind(b.name).bind(b.role).bind(b.instructions).bind(b.provider).bind(b.x).bind(b.y).bind(b.enabled).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.character_id).execute(&mut *tx).await?.rows_affected();
+    tx.commit().await?;
     audit(&a, &u, Some(wid), "agent.updated").await?;
     changed(n)
 }

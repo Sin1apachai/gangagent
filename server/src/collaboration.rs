@@ -179,6 +179,14 @@ async fn valid_agents(a: &App, wid: Uuid, steps: &[PlanStep]) -> Result<()> {
             return Err(bad("Every step needs an enabled agent from this workspace"));
         }
     }
+    let mut tx = a.db.begin().await?;
+    for step in steps {
+        if let Some(reviewer) = step.reviewer_id {
+            organization::validate_reviewer(&mut tx, wid, reviewer).await?;
+        }
+        organization::freeze_context(&mut tx, wid, Some(step.agent_id), &step.skill_ids, None)
+            .await?;
+    }
     Ok(())
 }
 async fn edit_plan(
@@ -240,25 +248,44 @@ async fn approve_plan(
         return Err(bad("Confirm subscription usage"));
     }
     let mut tx = a.db.begin().await?;
+    sqlx::query("SELECT id FROM workspaces WHERE id=$1 AND deleted_at IS NULL FOR UPDATE")
+        .bind(wid)
+        .fetch_one(&mut *tx)
+        .await?;
     let raw:Option<Value>=sqlx::query_scalar("SELECT steps FROM plans WHERE id=$1 AND workspace_id=$2 AND created_by=$3 AND status='draft' AND version=$4 FOR UPDATE").bind(id).bind(wid).bind(u.id).bind(b.version).fetch_optional(&mut *tx).await?;
     let raw = raw.ok_or(Error(
         StatusCode::CONFLICT,
         "Plan changed or already started",
     ))?;
     let steps: Vec<PlanStep> = serde_json::from_value(raw).map_err(|_| bad("Invalid steps"))?;
-    valid_agents(&a, wid, &steps).await?;
+    if !PlanPolicy::validate(&steps) {
+        return Err(bad("Invalid plan steps"));
+    }
     let mut ids: Vec<Uuid> = Vec::new();
     for step in &steps {
-        let provider: String = sqlx::query_scalar("SELECT provider FROM agents WHERE id=$1")
+        let provider: String = sqlx::query_scalar("SELECT provider FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL")
             .bind(step.agent_id)
-            .fetch_one(&mut *tx)
-            .await?;
+            .bind(wid)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(bad("Every step needs an enabled agent from this workspace"))?;
         let ready:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM provider_connections WHERE user_id=$1 AND provider=$2 AND enabled AND billing_acknowledged AND NOT reauth_required)").bind(u.id).bind(&provider).fetch_one(&mut *tx).await?;
         if !ready {
             return Err(bad("Enable and connect every provider used by the plan"));
         }
         let tid = Uuid::new_v4();
-        sqlx::query("INSERT INTO tasks(id,workspace_id,created_by,title,description,provider,agent_id,plan_id,execution_requested) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true)").bind(tid).bind(wid).bind(u.id).bind(&step.title).bind(&step.description).bind(provider).bind(step.agent_id).bind(id).execute(&mut *tx).await?;
+        let reviewer = step.reviewer_id.unwrap_or(u.id);
+        organization::validate_reviewer(&mut tx, wid, reviewer).await?;
+        let contract = json!(step);
+        let context = organization::freeze_context(
+            &mut tx,
+            wid,
+            Some(step.agent_id),
+            &step.skill_ids,
+            Some(contract.clone()),
+        )
+        .await?;
+        sqlx::query("INSERT INTO tasks(id,workspace_id,created_by,title,description,provider,agent_id,plan_id,execution_requested,execution_context,reviewer_id,workflow_step,acceptance_criteria) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12)").bind(tid).bind(wid).bind(u.id).bind(&step.title).bind(&step.description).bind(provider).bind(step.agent_id).bind(id).bind(context).bind(reviewer).bind(contract).bind(&step.acceptance_criteria).execute(&mut *tx).await?;
         for &parent in &step.depends_on {
             sqlx::query("INSERT INTO task_dependencies VALUES($1,$2)")
                 .bind(tid)

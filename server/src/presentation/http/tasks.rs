@@ -66,7 +66,7 @@ pub(crate) async fn edit_task(
     let u = user(&a, &h).await?;
     access(&a, &u, wid, true).await?;
     check_task(&a, wid, &b).await?;
-    let n=sqlx::query("UPDATE tasks SET title=$1,description=$2,provider=$3,agent_id=$4,project_id=$8,priority=$9,acceptance_criteria=$10,version=version+1 WHERE id=$5 AND workspace_id=$6 AND version=$7 AND deleted_at IS NULL AND status!='running' AND NOT execution_requested").bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).execute(&a.db).await?.rows_affected();
+    let n=sqlx::query("UPDATE tasks SET title=$1,description=$2,provider=$3,agent_id=$4,project_id=$8,priority=$9,acceptance_criteria=$10,version=version+1 WHERE id=$5 AND workspace_id=$6 AND version=$7 AND deleted_at IS NULL AND status!='running' AND NOT execution_requested AND workflow_step IS NULL AND (execution_context IS NULL OR (provider=$3 AND agent_id IS NOT DISTINCT FROM $4))").bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).execute(&a.db).await?.rows_affected();
     audit(&a, &u, Some(wid), "task.updated").await?;
     changed(n)
 }
@@ -101,6 +101,21 @@ pub(crate) async fn run_task(
         .fetch_one(&mut *tx)
         .await?;
     let n=sqlx::query("UPDATE tasks t SET status='queued',execution_requested=true,cancel_requested=false,error='',version=version+1 WHERE workspace_id=$1 AND id=$2 AND created_by=$3 AND deleted_at IS NULL AND status IN ('queued','failed','cancelled','waiting_auth','waiting_quota','interrupted') AND NOT execution_requested AND attempts<3 AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND EXISTS(SELECT 1 FROM provider_connections c WHERE c.user_id=$3 AND c.provider=t.provider AND c.enabled AND c.billing_acknowledged)").bind(wid).bind(id).bind(u.id).execute(&mut *tx).await?.rows_affected();
+    if n > 0 {
+        let (agent, context): (Option<Uuid>, Option<Value>) =
+            sqlx::query_as("SELECT agent_id,execution_context FROM tasks WHERE id=$1 FOR UPDATE")
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
+        if context.is_none() {
+            let context = organization::freeze_context(&mut tx, wid, agent, &[], None).await?;
+            sqlx::query("UPDATE tasks SET execution_context=$1 WHERE id=$2")
+                .bind(context)
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
     tx.commit().await?;
     if n == 0 {
         return Err(Error(StatusCode::CONFLICT,"Enable your provider connection, check billing acknowledgement, task ownership/state, and the three-attempt limit"));
@@ -135,7 +150,24 @@ pub(crate) async fn review_task(
     if b.feedback.len() > 10000 || (!b.accept && !valid(&b.feedback, 10000)) {
         return Err(bad("Feedback is required for revisions (max 10000 bytes)"));
     }
-    let n=sqlx::query("UPDATE tasks SET status=$1,review_feedback=$2,execution_requested=false,version=version+1 WHERE workspace_id=$3 AND id=$4 AND status='review' AND deleted_at IS NULL AND ($1='done' OR attempts<3)").bind(if b.accept{"done"}else{"queued"}).bind(&b.feedback).bind(wid).bind(id).execute(&a.db).await?.rows_affected();
+    let mut tx = a.db.begin().await?;
+    let assigned:Option<Option<Uuid>>=sqlx::query_scalar("SELECT reviewer_id FROM tasks WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL FOR UPDATE").bind(id).bind(wid).fetch_optional(&mut *tx).await?;
+    if let Some(Some(reviewer)) = assigned {
+        if reviewer != u.id && !u.is_super_admin {
+            let owner:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM memberships WHERE workspace_id=$1 AND user_id=$2 AND role='owner')").bind(wid).bind(u.id).fetch_one(&mut *tx).await?;
+            if !owner {
+                return Err(Error(
+                    StatusCode::FORBIDDEN,
+                    "Only the assigned reviewer or workspace owner can review this workflow task",
+                ));
+            }
+        }
+    }
+    let n=sqlx::query("UPDATE tasks SET status=$1,review_feedback=$2,execution_requested=false,version=version+1 WHERE workspace_id=$3 AND id=$4 AND status='review' AND deleted_at IS NULL AND ($1='done' OR attempts<3)").bind(if b.accept{"done"}else{"queued"}).bind(&b.feedback).bind(wid).bind(id).execute(&mut *tx).await?.rows_affected();
+    tx.commit().await?;
+    if n > 0 {
+        audit(&a, &u, Some(wid), "task.reviewed").await?;
+    }
     if n > 0 {
         event(
             &a.db,

@@ -1,0 +1,22 @@
+CREATE TABLE skills(id uuid PRIMARY KEY,workspace_id uuid NOT NULL REFERENCES workspaces(id),version integer NOT NULL DEFAULT 0,created_by uuid NOT NULL REFERENCES users(id),created_at timestamptz NOT NULL DEFAULT now(),deleted_at timestamptz);
+CREATE TABLE skill_versions(skill_id uuid NOT NULL REFERENCES skills(id),version integer NOT NULL,title text NOT NULL,description text NOT NULL,instructions text NOT NULL,input_contract text NOT NULL,output_contract text NOT NULL,acceptance_criteria text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(skill_id,version));
+ALTER TABLE agents ADD COLUMN manager_id uuid REFERENCES agents(id),ADD COLUMN department text NOT NULL DEFAULT '',ADD COLUMN responsibilities text NOT NULL DEFAULT '',ADD COLUMN decision_scope text NOT NULL DEFAULT '';
+CREATE TABLE agent_skills(agent_id uuid NOT NULL REFERENCES agents(id),skill_id uuid NOT NULL REFERENCES skills(id),pinned_version integer,PRIMARY KEY(agent_id,skill_id),FOREIGN KEY(skill_id,pinned_version) REFERENCES skill_versions(skill_id,version));
+CREATE TABLE workflows(id uuid PRIMARY KEY,workspace_id uuid NOT NULL REFERENCES workspaces(id),version integer NOT NULL DEFAULT 0,created_by uuid NOT NULL REFERENCES users(id),created_at timestamptz NOT NULL DEFAULT now(),deleted_at timestamptz);
+CREATE TABLE workflow_versions(workflow_id uuid NOT NULL REFERENCES workflows(id),version integer NOT NULL,title text NOT NULL,description text NOT NULL,steps jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(workflow_id,version));
+ALTER TABLE plans ADD COLUMN workflow_snapshot jsonb;
+CREATE TABLE workflow_launches(user_id uuid NOT NULL REFERENCES users(id),request_id uuid NOT NULL,workflow_id uuid NOT NULL REFERENCES workflows(id),workflow_version integer NOT NULL,goal text NOT NULL,plan_id uuid NOT NULL REFERENCES plans(id),PRIMARY KEY(user_id,request_id));
+ALTER TABLE tasks ADD COLUMN execution_context jsonb,ADD COLUMN reviewer_id uuid REFERENCES users(id),ADD COLUMN workflow_step jsonb;
+CREATE FUNCTION immutable_office_revision() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Published revisions are immutable'; END $$;
+CREATE TRIGGER immutable_skill_version BEFORE UPDATE OR DELETE ON skill_versions FOR EACH ROW EXECUTE FUNCTION immutable_office_revision();
+CREATE TRIGGER immutable_workflow_version BEFORE UPDATE OR DELETE ON workflow_versions FOR EACH ROW EXECUTE FUNCTION immutable_office_revision();
+-- Workers consume only frozen task context; no access to library or organization tables is granted.
+ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skill_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_launches ENABLE ROW LEVEL SECURITY;
+CREATE INDEX skills_workspace_idx ON skills(workspace_id);
+CREATE INDEX workflows_workspace_idx ON workflows(workspace_id);
+CREATE INDEX agents_manager_idx ON agents(manager_id);
