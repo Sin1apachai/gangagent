@@ -1,175 +1,178 @@
-# Agent Office — Phase 2
+# Agent Office
 
-Rust (Axum + SQLx), React + TypeScript, PostgreSQL, Redis และ Worker ใน Docker Compose สำหรับใช้งานบนเครื่องของเจ้าของระบบ
+สำนักงาน AI สไตล์เกม RPG สำหรับจัดทีม Agent มอบหมายงาน ตรวจผลงาน และเก็บความรู้ร่วมกัน พัฒนาด้วย **Rust + React + TypeScript** และรันผ่าน **Docker Compose**
 
-**ไม่มีข้อมูลตัวอย่าง และไม่เชื่อมบัญชี AI ให้อัตโนมัติ** การติดตั้งใหม่สร้างเฉพาะบัญชี Super Admin จาก `.env` ส่วน Workspace, งาน, ความรู้ และ Agent ให้ผู้ใช้เพิ่มเอง
+> รุ่นสำหรับใช้งานบนเครื่องหรือ Docker host ที่คุณควบคุม เว็บเปิดเฉพาะ `localhost` โดยค่าเริ่มต้น การติดตั้งใหม่ไม่มีข้อมูลตัวอย่างและไม่เชื่อมบัญชี AI ให้อัตโนมัติ
 
-## เริ่มใช้งาน
+![สำนักงาน RPG พร้อมเครื่องมือจัดห้อง](docs/images/office.png)
+
+## ทำอะไรได้บ้าง
+
+| ส่วนงาน | ความสามารถ |
+| --- | --- |
+| **Office** | สร้าง Workspace จัดห้อง วาง/ย้าย/หมุน/ทำสำเนาเฟอร์นิเจอร์ ย้อนกลับ/ทำซ้ำ ซูม และดูตัวละครตามสถานะงาน |
+| **กระดานงาน** | กรองสถานะ เครื่องมือ และ Agent เรียงงานตามวันที่หรือความสำคัญ สลับกระดาน/รายการ และติดตามงานที่มีปัญหา |
+| **โปรเจกต์** | จัดกลุ่มงาน ระบุความสำคัญและเกณฑ์ตรวจรับ |
+| **แผนทีม** | ให้ Manager เสนอแผน หรือจัดขั้นตอนเอง ตรวจแผนก่อนอนุมัติ และส่งต่อผลงานหลังตรวจรับ |
+| **Knowledge** | เก็บความรู้พร้อมแหล่งที่มา ตรวจสอบก่อนให้ AI ใช้ และค้นหาด้วยความหมายข้ามภาษาหรือ full-text |
+| **Team** | เพิ่ม Agent กำหนดบทบาท คำสั่งประจำตัว ผู้ให้บริการ และตำแหน่งในห้อง |
+| **Settings** | เชื่อมบัญชี AI ผ่านเว็บ จัดการโปรไฟล์ สมาชิก สิทธิ์ และ Worker ส่วนตัว |
+| **Trash** | กู้คืน Workspace งาน Agent และความรู้ที่ย้ายไปถังขยะ |
+
+ข้อมูลอยู่ใน PostgreSQL ส่วนไฟล์ผลงานอยู่ใน Docker volume จึงต้องสำรองทั้งสองส่วนเมื่อย้ายเครื่อง Redis ใช้สำหรับข้อมูลชั่วคราว ไม่ใช่แหล่งเก็บความรู้หลัก
+
+## เริ่มติดตั้ง
+
+### สิ่งที่ต้องมี
+
+- Git และ Docker พร้อม Docker Compose v2 ที่รองรับ `!reset` / `!override`
+- Python 3 สำหรับสร้างค่าเริ่มต้นและใช้สคริปต์สำรอง/กู้คืน
+- `shasum` สำหรับตรวจ checksum ของ backup
+- บัญชี AI ของคุณเองที่ใช้งาน CLI ของผู้ให้บริการได้ หากต้องการรันงานจริง
+
+ไม่ต้องติดตั้ง Rust, Node.js หรือ CLI ของ AI ลงบนเครื่องเพื่อรันแอป ทุกบริการหลัก build และทำงานใน Docker
 
 ```sh
+git clone https://github.com/Sin1apachai/gangagent.git
+cd gangagent
 ./setup.sh
 docker compose up --build -d
 ```
 
-เปิด http://localhost:8088 และใช้ `OWNER_EMAIL` / `OWNER_PASSWORD` จาก `.env` เก็บไฟล์นี้เป็นความลับ การเปลี่ยนรหัสผ่านใน `.env` หลังติดตั้งแล้วจะไม่เปลี่ยนรหัสผ่านบัญชีเดิม ให้ใช้ Settings → โปรไฟล์แทน
+เปิด **http://localhost:8088** แล้วเข้าสู่ระบบด้วย `OWNER_EMAIL` และ `OWNER_PASSWORD` ที่สร้างไว้ใน `.env` บัญชีแรกเป็น Super Admin
 
-## เพิ่ม / แก้ไข / ลบข้อมูล
+- `setup.sh` สุ่มรหัสผ่านให้ ไม่เขียนทับ `.env` เดิม
+- เก็บ `.env` เป็นความลับ อย่า commit หรือส่งให้ผู้อื่น
+- การแก้ `OWNER_PASSWORD` ใน `.env` หลังติดตั้งแล้วไม่เปลี่ยนรหัสผ่านของบัญชีเดิม ให้เปลี่ยนจาก **Settings → โปรไฟล์**
+- เปลี่ยนพอร์ตได้ด้วย `OFFICE_PORT` ใน `.env`
 
-| เมนู | ทำอะไรได้ |
+ตรวจหรือหยุดบริการ:
+
+```sh
+docker compose ps
+docker compose logs --tail=100 app worker
+docker compose down
+```
+
+`docker compose down` เก็บ volumes ไว้ ส่วน `down --volumes` ลบข้อมูลถาวร จึงไม่ควรใช้กับระบบที่ต้องการเก็บข้อมูล
+
+## คู่มือใช้งานครั้งแรก
+
+### 1. สร้างพื้นที่และจัดห้อง
+
+กด **New workspace** ตั้งชื่อ แล้วเปิด **Office → จัดห้อง** เลือกเฟอร์นิเจอร์และคลิกวาง ลากเพื่อย้าย หมุนหรือทำสำเนาได้ จากนั้นกด **บันทึกห้อง**
+
+- ปุ่ม **พอดีจอ** คืนแผนที่ให้พอดีกับพื้นที่แสดงผล
+- ใช้ลูกศรและ Enter เพื่อวางด้วยคีย์บอร์ด, R หมุน, Ctrl/⌘ Z ย้อนกลับ
+- **จัดการพื้นที่** ใช้แก้ชื่อหรือย้าย Workspace ไปถังขยะ
+- ตัวละครแสดงจาก Agent ที่คุณเพิ่มเอง ไม่มีตัวละครหรือผลงานที่สร้างแทรกให้ในการติดตั้งใหม่
+
+### 2. เชื่อมบัญชี AI
+
+เปิด **Settings → การเชื่อมต่อ AI** แล้วกดปุ่มเชื่อมบัญชีของผู้ให้บริการ ทำขั้นตอนบนหน้าทางการที่เปิดให้
+
+![Settings สำหรับเชื่อมบัญชีและจัดการสมาชิก](docs/images/settings.png)
+
+- **Codex:** เปิดหน้ายืนยันทางการและใส่รหัสอุปกรณ์ หากบัญชีแจ้งว่าปิด device-code login ให้เปิดตามคำแนะนำของผู้ให้บริการก่อน
+- **Claude:** ยืนยันบนหน้าทางการ แล้วนำรหัสยืนยันครั้งเดียวกลับมาใส่ในฟอร์มที่ระบบแสดง ไม่ใช้รหัสผ่านหรือ API key
+- รอจนสถานะ **Login พร้อม** แล้วตรวจการตั้งค่าเครดิตเพิ่มเติมของบัญชี ติ๊กยืนยันและเปิดใช้งานผู้ให้บริการที่ต้องการ
+- หาก token ถูกเพิกถอนหรือหมดอายุ ใช้ **เชื่อมบัญชีใหม่**
+
+การ Login ไม่ได้เริ่มงาน และ Worker อาจรอให้งานปัจจุบันจบก่อนดำเนินการ Login ข้อมูลบัญชี AI อยู่ใน credential volume ของ Worker แยกจากเว็บ ไม่ดึงบัญชีที่ Login บนเครื่องมาให้อัตโนมัติ
+
+ระบบไม่มี API-key fallback หรือการซื้อเครดิตให้อัตโนมัติ แต่ไม่สามารถเปลี่ยนการตั้งค่า paid overage ของผู้ให้บริการแทนคุณได้ จึงไม่รับประกันค่าใช้จ่ายเป็นศูนย์หากบัญชีเปิดเครดิตเพิ่มเติมอยู่
+
+### 3. เพิ่ม Agent และสร้างงาน
+
+1. เปิด **Team → เพิ่ม Agent** ตั้งชื่อ บทบาท คำสั่ง และเลือก Codex หรือ Claude
+2. กด **สร้างงาน** ใส่รายละเอียด เลือก Agent ที่ใช้เครื่องมือตรงกัน และระบุเกณฑ์ตรวจรับ
+3. บันทึกงานก่อน ตรวจข้อมูล แล้วกด **เริ่มงาน** เมื่อต้องการใช้โควตา AI
+4. เปิดงานเพื่อติดตามผล ประวัติ และไฟล์ผลงาน
+5. ตรวจรับเป็นเสร็จ หรือส่งกลับพร้อม feedback แล้วกดเริ่มรอบแก้ไข
+
+แนบไฟล์อ้างอิงได้สูงสุด **5 ไฟล์ ไฟล์ละ 1 MiB** รอบแก้ไขจะได้รับผลงานเดิมที่ลงทะเบียนไว้ โดยประวัติรอบก่อนยังอยู่
+
+### 4. ใช้กระดานติดตามงาน
+
+![กระดานงานพร้อมตัวกรองและการ์ดผลงาน](docs/images/task-board.png)
+
+- เลือก **ทั้งหมด / รอทำ / กำลังทำ / รอตรวจ / เสร็จ / ต้องติดตาม** เพื่อจำกัดงานที่แสดง
+- กรอง **เครื่องมือ** และ **ผู้รับผิดชอบ** หรือค้นหาจากชื่องาน รายละเอียด และปัญหา
+- เรียงตามงานใหม่ งานเก่า หรือความสำคัญ
+- สลับ **กระดาน / รายการ** ตามวิธีอ่านที่ถนัด
+- กดชื่อการ์ดหรือปุ่ม **เปิดงาน / ตรวจผลงาน / ดูผลงาน** เพื่ออ่านรายละเอียดเต็ม
+- ใช้ **ล้างตัวกรอง** หากต้องการกลับมาดูงานทั้งหมด
+
+| สถานะ | สิ่งที่ควรทำ |
 | --- | --- |
-| Office | สร้างและแก้ชื่อ Workspace, ย้ายไปถังขยะ, จัดวาง/ย้าย/หมุน/ลบเฟอร์นิเจอร์, ดู Agent และสถานะงานจริง |
-| Task board | เพิ่มและแก้ไขงาน, เลือกเครื่องมือและ Agent, เริ่มงาน, ยกเลิก, ตรวจผลงาน, ดาวน์โหลดไฟล์, ตรวจรับหรือส่งแก้, ลบและกู้คืน |
-| Knowledge | เพิ่ม/แก้/ลบ/กู้คืน/ค้นหา, ระบุแหล่งที่มา, ทำเครื่องหมายตรวจสอบก่อนแนบให้ AI |
-| Team | เพิ่ม/แก้/ลบ/กู้คืน Agent, กำหนดบทบาท คำสั่งประจำตัว เครื่องมือ ตำแหน่ง และเปิด/ปิดใช้งาน |
-| Settings | แก้โปรไฟล์และรหัสผ่าน, เปิด/ปิดการใช้ผู้ให้บริการ, ดู Worker และสถานะ Login, จัดการสมาชิกและสิทธิ์ Workspace |
-| Settings สำหรับ Super Admin | เพิ่ม/แก้/ปิดบัญชีผู้ใช้ และกู้คืนบัญชีที่ปิดแล้ว โดยไม่สามารถลบบัญชีตนเองหรือ Super Admin ผ่านเมนูนี้ |
-| Trash | กู้คืน Workspace, งาน, ความรู้ และ Agent โดยไม่มีปุ่มล้างข้อมูลถาวร |
+| รอทำ | ตรวจรายละเอียดแล้วกดเริ่มงาน งานที่ส่งคำขอแล้วอาจรอ Worker หรืองานก่อนหน้า |
+| กำลังทำ | ติดตามงานหรือขอยกเลิกก่อนแก้ไข |
+| รอตรวจ | อ่านผลงาน ดาวน์โหลดไฟล์ แล้วตรวจรับหรือส่งแก้ |
+| เสร็จ | งานที่ผ่านการตรวจรับแล้ว |
+| ต้องติดตาม | เปิดดูสาเหตุ เช่น รอ Login รอโควตา งานล้มเหลว สะดุด หรือถูกยกเลิก |
 
-การแก้ข้อมูลมี version checks เพื่อป้องกันการทับข้อมูลที่ผู้อื่นเพิ่งแก้ งานที่กำลังทำต้องยกเลิกให้เสร็จก่อนแก้หรือลบ ไม่สามารถลบ Workspace ที่ยังมีงานกำลังทำ สมาชิก Viewer ดูข้อมูลได้แต่แก้ไขไม่ได้ การแก้สิทธิ์สมาชิกทำได้เฉพาะเจ้าของ Workspace หรือ Super Admin
+<details>
+<summary>ดูหน้ากระดานบนจอแคบ</summary>
 
-## เชื่อม Codex และ Claude Code
+![กระดานงานบนจอแคบ](docs/images/task-board-mobile.png)
 
-เปิด **Settings → การเชื่อมต่อ AI** แล้วกด **เชื่อมบัญชี ChatGPT** หรือ **เชื่อมบัญชี Claude** ได้เลย ไม่ต้องพิมพ์คำสั่ง Docker
+เลื่อนเฉพาะกระดานด้านข้าง หรือเลือกสถานะเดียวเพื่อให้การ์ดอ่านได้เต็มพื้นที่ มุมมองรายการใช้การเลื่อนแนวตั้ง
 
-- Codex: เปิดหน้ายืนยันทางการ แล้วใส่รหัสอุปกรณ์ที่แสดงในเว็บ หากบัญชียังปิด Device-code login ให้เปิดใน Security ของ ChatGPT ก่อน
-- Claude: เปิดหน้ายืนยันทางการ แล้วนำรหัสยืนยันครั้งเดียวที่ได้กลับมาใส่ในเว็บ (ไม่ใช่รหัสผ่านหรือ API key)
-- สถานะอัปเดตอัตโนมัติ ยกเลิกคำขอได้ และคำขอหมดอายุใน 10 นาที หาก Worker กำลังทำงาน คำขอจะรอจนงานจบ
-- บัญชีที่เชื่อมแล้วจะแสดง Login พร้อม และไม่ถูกบังคับ Login ใหม่ การเปิดใช้โควตา AI ยังแยกจากการ Login
-- สมาชิกต้องมี Worker ผูกกับบัญชีตนเอง จึงใช้ปุ่มเชื่อมบัญชีได้
+</details>
 
-รหัสยืนยันครั้งเดียวของ Claude ส่งผ่าน Redis แบบหน่วยความจำ มีอายุ 60 วินาทีและอ่านครั้งเดียว ไม่เก็บใน PostgreSQL หรือ log ส่วน token เก็บโดย CLI ใน credential volumes เดิม เว็บไม่ mount credential volumes หรือ Docker socket
+### 5. จัดแผนทำงานร่วมกัน
 
-วิธี Terminal สำรองสำหรับผู้ดูแล:
+เปิด **แผนทีม** ใส่เป้าหมาย แล้วเลือก Manager ให้เสนอแผน หรือจัดแผนเองได้สูงสุด **8 ขั้นตอน**
 
-```sh
-docker compose run --rm codex-login
-docker compose run --rm claude-login
-```
+1. หากเลือก Manager ระบบสร้างงานเสนอแผนที่ยังไม่เริ่ม ให้กดเริ่มงานนั้นเอง
+2. ตรวจผลงานของ Manager แล้วนำข้อเสนอเข้าร่างแผน
+3. แก้ผู้รับผิดชอบ รายละเอียด และความสัมพันธ์ของขั้นตอนก่อนอนุมัติ
+4. ยืนยันการใช้โควตาแล้วกด **อนุมัติและเริ่มทีม**
+5. ตรวจรับแต่ละงาน งานที่พึ่งพากันจะรอให้งานก่อนหน้าผ่านการตรวจรับ แล้วจึงรับข้อความและไฟล์ผลงานไปทำต่อ
 
-เลือกบัญชีสมาชิก ChatGPT/Claude ตามขั้นตอนทางการ ไม่เลือก API/Console billing และไม่ส่งรหัสผ่านหรือ token เข้าหน้าเว็บ Agent Office
+### 6. เก็บและค้นหาความรู้
 
-ตรวจสถานะหรือออกจากระบบ:
+เพิ่มข้อมูลใน **Knowledge** พร้อมแหล่งที่มา และทำเครื่องหมายตรวจสอบเมื่อพร้อมให้ AI ใช้ ค้นหาเฉพาะข้อมูลที่ตรวจสอบแล้วได้จากฟอร์มค้นหาพร้อมแหล่งอ้างอิง
 
-```sh
-docker compose run --rm codex-login login status
-docker compose run --rm claude-login auth status
-docker compose run --rm codex-login logout
-docker compose run --rm claude-login auth logout
-```
-
-Codex device-code login อาจต้องเปิดสิทธิ์ในบัญชี ChatGPT ก่อน ตามข้อความที่ CLI แสดง Claude login อาจให้เปิด URL และทำขั้นตอนต่อใน browser
-
-จากนั้นเปิด **Settings → การเชื่อมต่อ AI** ปิด Usage credits / การเติมเงินอัตโนมัติที่บัญชีผู้ให้บริการของคุณเองก่อน แล้วจึงติ๊กยืนยันและเปิดใช้งานการเชื่อมต่อที่ต้องการ
-
-ระบบไม่ส่ง API keys ให้กระบวนการ AI ไม่ยอมใช้ API-key authentication และไม่มีการสลับไป API แบบจ่ายเพิ่ม แต่ **subscription authentication ไม่ได้ปิดการใช้เครดิตเพิ่มเติมที่ตั้งไว้กับผู้ให้บริการแทนคุณ** จึงไม่ใช่การรับประกันค่าใช้จ่ายเป็นศูนย์หากบัญชีของคุณเปิด paid overage อยู่
-
-ข้อมูล Login เก็บใน Docker credential volumes ของ Worker แยกจากเว็บ ไม่มีการคัดลอก macOS keychain หรือบัญชีที่ล็อกอินบน host มาให้ Docker โดยอัตโนมัติ CLI ที่ติดตั้ง: Codex 0.165.0 และ Claude Code 2.1.312
-
-## ทดลองวงจรงาน
-
-1. สร้าง Workspace และเพิ่ม Knowledge ที่ตรวจสอบแล้ว (ถ้ามี)
-2. เพิ่ม Agent พร้อมบทบาท คำสั่ง และเลือก Codex หรือ Claude
-3. สร้างงานและเลือก Agent ที่ใช้เครื่องมือเดียวกัน
-4. กด **เริ่มงาน** งานที่บันทึกเฉย ๆ จะไม่เรียก AI
-5. เปิดรายละเอียดงานเพื่อดูสถานะ ประวัติ ผลลัพธ์ และไฟล์ผลงาน
-6. ตรวจรับเป็นเสร็จ หรือส่งกลับพร้อมสิ่งที่ต้องแก้แล้วกดเริ่มใหม่
-
-หากยังไม่ Login งานจะเป็น **รอ Login** โดยไม่เริ่มโมเดล หากพบข้อจำกัดโควตาที่ตรวจจับได้จะเป็น **รอโควตา** และไม่ลองใหม่เอง งานหนึ่งมีได้สูงสุดสามครั้งที่เริ่มทำจริง รอบที่ยังรอ Login ไม่นับเป็นการทำงานจริง
-
-Worker รับเฉพาะงานของบัญชีที่ผูกไว้กับ Worker เท่านั้น สมาชิกคนอื่นไม่ได้ใช้ subscription ของเจ้าของโดยอัตโนมัติ การให้ผู้ใช้คนอื่นมี Worker และการเชื่อมต่อของตัวเองยังต้องจัดสรรแยก ไม่ใช่ระบบแชร์บัญชี Pro
-
-## ทดสอบผ่าน Docker Compose
-
-```sh
-./test.sh
-```
-
-สคริปต์สร้าง Compose project แยก ใช้ฐานข้อมูล `office_test`, Worker ทดสอบสองตัว และไม่เปิดพอร์ตหรือใช้ credential volumes ของระบบจริง หลังจบจะล้างเฉพาะระบบทดสอบ มี integration tests 31 รายการ และ Rust unit tests 7 รายการ รวมการแยกสิทธิ์, CRUD/กู้คืน, งานซ้ำ, ยกเลิก, โควตา, feedback, artifact download และการหยุดงานเมื่อปิดการเชื่อมต่อ
-
-Fixture worker มีตัวป้องกันสองชั้น: ต้องเปิด `ALLOW_TEST_WORKER=1` และใช้ชื่อฐานข้อมูล `office_test` ผลลัพธ์ระบุ `FIXTURE TEST ONLY — no AI was called.` เสมอ การผ่านชุดนี้ไม่ใช่หลักฐานว่าได้เรียกโมเดลจริงแล้ว
-
-มี helper probes สำหรับทดสอบ restart/lease recovery และ unauthenticated CLI ใน disposable preview ที่ต้อง opt in ด้วย `OFFICE_TEST_TARGET=isolated_preview` เท่านั้น:
-
-- `tests/probe_recovery.py`
-- `tests/probe_real_auth.py`
-
-จัดรูปแบบโค้ด:
-
-```sh
-docker compose --profile tools run --rm web-tools
-docker compose --profile tools run --rm rust-tools
-```
-
-## หยุด สำรองข้อมูล และย้ายเครื่อง
-
-`docker compose down` เก็บข้อมูลใน volumes ไว้ **อย่าใช้ `down -v` กับระบบจริง** หากไม่ต้องการลบข้อมูล
-
-ควรหยุด Worker ชั่วคราวระหว่างสำรองไฟล์และฐานข้อมูล เพื่อไม่ให้มีการสร้างผลงานค้างระหว่าง snapshot:
-
-```sh
-mkdir -p backups
-docker compose stop worker
-docker compose exec -T postgres pg_dump -U office -d office -Fc > backups/office.dump
-docker compose run --rm --no-deps -T --entrypoint sh worker -c 'mkdir -p /data/runs && tar -czf - -C /data runs' > backups/runs.tar.gz
-docker compose start worker
-```
-
-ย้าย source, `.env` อย่างปลอดภัย, database dump และ runs archive ไปเครื่องใหม่ แล้วเริ่ม Postgres ให้ healthy ก่อน restore:
-
-```sh
-docker compose up -d postgres
-docker compose exec -T postgres pg_restore -U office -d office --clean --if-exists < backups/office.dump
-docker compose build worker
-docker compose run --rm --no-deps -T --entrypoint tar worker -xzf - -C /data < backups/runs.tar.gz
-docker compose up --build -d
-```
-
-Login ผู้ให้บริการใหม่บนเครื่องใหม่ ไม่ต้องส่งออก credential volumes ความรู้เก็บใน Postgres; ผลงานอยู่ใน `runs-data` จึงต้องสำรองทั้งสองส่วน การมี Docker volume เพียงอย่างเดียวไม่ใช่ backup อัตโนมัติ
-
-## ขอบเขตที่ยังต้องพัฒนาต่อ
-
-- ทีมหลาย Agent ที่วางแผนและแจกงานกันอัตโนมัติ และ Super Intelligence ข้าม Workspace
-- การเดินหลบเฟอร์นิเจอร์, undo/redo และการควบคุมแผนที่ด้วยคีย์บอร์ด
-- สมาชิกแต่ละคนมี Worker ส่วนตัวผ่านหน้าจอ pairing
-- MFA, password reset ทางอีเมล, HTTPS และการดูแล production
-- กำหนดวิธีอนุมัติเครื่องมือเพิ่มเติมสำหรับงานที่เกินขอบเขต sandbox ปัจจุบัน
-
-Claude ถูกจำกัดให้ใช้เครื่องมือไฟล์ ไม่มี shell หรือ MCP ภายนอก และปฏิเสธคำขอสิทธิ์ที่ไม่อนุญาต Codex ใช้ workspace-write sandbox และปิด network ของ shell งานบางประเภทจึงอาจต้องการสิทธิ์หรือเครื่องมือเพิ่ม ระบบไม่ข้าม sandbox หรือเปิด permission bypass ให้อัตโนมัติ
-
-Local edition ผูกพอร์ตกับ `127.0.0.1` เท่านั้น ยังไม่ควรเปิดออก Internet โดยตรง
-
-อ้างอิงทางการ: [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [Codex authentication](https://learn.chatgpt.com/docs/auth), [Claude CLI](https://code.claude.com/docs/en/cli-reference), [Claude subscription/SDK](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)
-
-## Phase 2 revision continuity
-
-Revision runs receive the latest reviewed result for that same task with the user feedback (up to 60,000 UTF-8 bytes). Prior registered source files are copied into the new run, with the original run preserved. Downloads remain available under each run in history; the latest-files section only shows the newest run. Settings now shows worker identity, last heartbeat, mode and authentication freshness.
-
-Execution requests are cleared when a workspace/user is deleted, a member loses write access, or a provider connection is disabled. Restoring access requires an explicit start. Running cancellation remains effective even if a provider is re-enabled before the next heartbeat.
-
-Revision file handoff is limited to registered artifacts from the latest reviewed run of the same task: up to 100 files, 10 MiB each and 50 MiB total. Symlinks, changed sizes and invalid paths fail before model invocation. Files in nested directories are supported; the worker gives the new copies writable ownership. Missing source files produce an explicit failure instead of asking the model to reconstruct them silently.
-
-
-## แผนทีม โปรเจกต์ และความรู้
-
-เมนูโปรเจกต์จัดกลุ่มงาน พร้อมลำดับความสำคัญและเกณฑ์ตรวจรับ เมนูแผนทีมรับเป้าหมาย เลือก Manager ให้เสนอแผน หรือจัดขั้นตอนเองได้ไม่เกิน 8 ขั้น แก้ไข/ตรวจแผนก่อนอนุมัติ งานถัดไปเริ่มได้เมื่อคุณตรวจรับงานก่อนหน้าแล้วเท่านั้น แนบไฟล์อ้างอิงได้ 5 ไฟล์ ไฟล์ละ 1 MiB ผลงานที่ตรวจรับถูกส่งต่อให้ขั้นตอนถัดไปโดยคงประวัติเดิม
-
-ค้นหาความรู้ข้ามภาษาโดยเปิดบริการภายในเครื่อง:
+หากต้องการค้นตามความหมายข้ามภาษา ให้เปิดบริการในเครื่องเพิ่มเติม:
 
 ```sh
 docker compose --profile semantic up --build -d
 ```
 
-ครั้งแรกดาวน์โหลดโมเดล open-source ในขั้น build หลังจากนั้นใช้ CPU ภายในเครื่อง ไม่มีค่าบริการ inference API หากบริการนี้ไม่พร้อม ระบบจะแจ้งว่าใช้ full-text search แทน Super Admin ให้/เพิกถอนสิทธิ์ Super Intelligence ของสมาชิกได้จาก Settings สิทธิ์นี้ใช้ค้นหาความรู้ที่ตรวจสอบแล้วข้าม Workspace พร้อมระบุแหล่งที่มา ไม่ใช่รหัสเข้าฐานข้อมูล
+โมเดลดาวน์โหลดในขั้น build และรันบน CPU ภายใน Docker หลัง build แล้วทำงานแบบ offline หากบริการนี้ไม่พร้อม ระบบใช้ PostgreSQL full-text และแจ้งวิธีค้นหาที่ใช้
 
-## Worker ส่วนตัว
+Super Admin ให้หรือเพิกถอนสิทธิ์ **Super Intelligence** แก่สมาชิกจาก Settings ได้ สิทธิ์นี้ค้นหาความรู้ที่ตรวจสอบแล้วข้าม Workspace พร้อมแสดงแหล่งที่มาและบันทึกประวัติ ไม่ได้มอบรหัสฐานข้อมูลหรืออนุญาต SQL อิสระให้โมเดล
 
-Settings → Worker ส่วนตัว → ตั้งชื่อ → ดาวน์โหลดไฟล์ติดตั้ง เก็บไฟล์เป็นความลับ เพราะมี credential ส่วนตัว ให้ผู้ดูแล Docker host ที่คุณควบคุมเท่านั้นติดตั้ง:
+## ผู้ใช้หลายคนและ Worker ส่วนตัว
 
-```sh
-docker compose -f office-worker-<id>.compose.json up -d
-```
+Super Admin เพิ่มบัญชีผู้ใช้ใน **Settings → บัญชีผู้ใช้** จากนั้นเจ้าของ Workspace เชิญสมาชิกและกำหนด Owner / Member / Viewer ได้ สมาชิกใช้บัญชีเว็บและบัญชี AI ของตนเอง ไม่แชร์ subscription ของเจ้าของโดยอัตโนมัติ
 
-จากนั้นผู้ใช้ Login เว็บของตนแล้วกดเชื่อมบัญชี AI ได้ตามปกติ เพิกถอน Worker ได้จาก Settings ไม่ใช้บัญชี Pro ร่วมกับเจ้าของ ระบบนี้ออกแบบสำหรับ Docker host ที่ไว้ใจ ไม่ใช่ให้ผู้ใช้ที่ไม่ไว้ใจควบคุม container เอง หากเปลี่ยนชื่อ Compose project ให้ตั้ง `OFFICE_DOCKER_NETWORK` และ `OFFICE_RUNS_VOLUME` ใน app ตาม network/volume จริง
+สำหรับผู้ที่ต้องรันงานด้วยบัญชี AI แยก:
+
+1. Login ด้วยบัญชีของผู้ใช้นั้น เปิด **Settings → Worker ส่วนตัว**
+2. ตั้งชื่อและดาวน์โหลดไฟล์ติดตั้ง เก็บไฟล์เป็นความลับ เพราะมี credential ส่วนตัว
+3. ให้ผู้ดูแล Docker host ที่ไว้ใจติดตั้งไฟล์บน host เดียวกับระบบหลัก:
+
+   ```sh
+   docker compose -f office-worker-<id>.compose.json up -d
+   ```
+
+4. กลับมาเชื่อมบัญชี AI จากเว็บของผู้ใช้นั้น
+5. ใช้ **เพิกถอนสิทธิ์** เพื่อยกเลิกการเชื่อมต่อของ Worker
+
+Worker แยก PostgreSQL role/RLS, Redis ACL, credential volumes และ UID ของโมเดล ขอบเขตนี้ยังถือว่าผู้ดูแล Docker และตัว coordinator เป็นผู้ที่ไว้ใจ ไม่ใช่ระบบสำหรับให้ผู้ใช้ที่ไม่ไว้ใจควบคุม container เอง
+
+## ความสามารถและข้อจำกัดของ AI
+
+| ผู้ให้บริการ | โหมดในระบบนี้ |
+| --- | --- |
+| Codex | ส่งผลลัพธ์ตาม JSON schema แล้วระบบตรวจ path/ขนาดก่อนบันทึกไฟล์ UTF-8 ไม่รัน shell หรือทดสอบโปรแกรมที่สร้าง |
+| Claude | เครื่องมืออ่าน/เขียน/แก้ไฟล์ภายในขอบเขตที่กำหนด ไม่มี shell หรือ MCP ภายนอก |
+
+Codex รองรับสูงสุด **20 ไฟล์ต่อรอบ, 256 KiB ต่อไฟล์, รวม 1 MiB** ไฟล์ข้อความอ้างอิงใช้บริบทที่จำกัด ไฟล์ binary หรือไฟล์ใหญ่จะไม่ถูกแนบเป็นข้อความ โค้ดที่โมเดลสร้างยังต้องนำไปตรวจและทดสอบก่อนใช้งาน
+
+งานมีเวลาทำงานสูงสุด 15 นาทีและจำกัดการเริ่มทำจริง 3 ครั้ง เมื่อพบ quota หรือ lease ขาด ระบบไม่ลองทำซ้ำเอง ต้องตรวจสาเหตุก่อนสั่งใหม่ ไม่มีการเปิด privileged container หรือข้าม sandbox ให้อัตโนมัติ
 
 ## สำรองและย้ายเครื่อง
 
@@ -177,13 +180,66 @@ docker compose -f office-worker-<id>.compose.json up -d
 ./backup.sh
 ```
 
-ไฟล์อยู่ใน `backups/office-<เวลา>/` รวมฐานข้อมูล ไฟล์ผลงานที่ลงทะเบียน และ checksum ไม่รวมบัญชี AI หรือ `.env` คัดลอกไปที่เก็บส่วนตัวอีกเครื่องด้วยตนเอง ทดสอบกู้คืนใน Compose project แยกก่อนสลับใช้งาน:
+ผลลัพธ์อยู่ใน `backups/office-<เวลา>/` ประกอบด้วย PostgreSQL dump ไฟล์ผลงานที่ลงทะเบียนพร้อม ACL และ checksum สคริปต์พักการรับงานใหม่และรอให้งานที่กำลังทำจบก่อนสำรอง
+
+Backup เป็นข้อมูลส่วนตัว ไม่รวม `.env` หรือ credential volumes ของ AI ให้คัดลอก backup ไปที่เก็บปลอดภัยอีกแห่งด้วยตนเอง
+
+ตัวอย่างทดสอบกู้คืนเข้า project แยก โดยใช้ไฟล์ `.env` ที่เตรียมไว้บนเครื่องปลายทาง:
 
 ```sh
-RESTORE_PROJECT=office-restore CONFIRM_RESTORE=office-restore ./restore.sh backups/office-<เวลา>
+docker compose build app worker
+OFFICE_PORT=8089 docker compose -p office-restore up -d postgres redis
+OFFICE_PORT=8089 RESTORE_PROJECT=office-restore CONFIRM_RESTORE=office-restore \
+  ./restore.sh backups/office-<เวลา>
 ```
 
-ต้องเตรียมฐานข้อมูล/volume ของ project ปลายทางก่อน ระบบไม่ยอมกู้ทับ project หลัก หลังย้ายให้เชื่อมบัญชี AI และสร้าง Worker ส่วนตัวใหม่ ดูข้อจำกัดและโครงสร้างโค้ดใน `docs/architecture.md`
+เปิด http://localhost:8089 ตรวจฐานข้อมูลและดาวน์โหลดผลงานก่อนสลับมาใช้งานจริง สคริปต์ไม่ยอมกู้ทับ project หลัก `agent-office` และจะเพิกถอน binding ของ Worker ส่วนตัวเดิม ต้องสร้าง Worker และเชื่อมบัญชี AI ใหม่หลังย้าย
 
+หากเปลี่ยนชื่อ Compose project ต้องกำหนด `OFFICE_DOCKER_NETWORK` และ `OFFICE_RUNS_VOLUME` ใน environment ของบริการ `app` ให้ตรงกับ network/volume จริง ก่อนออกไฟล์ Worker ส่วนตัว ดูรายละเอียดใน [สถาปัตยกรรม](docs/architecture.md)
 
-**ข้อจำกัด Codex ใน Docker รุ่นนี้:** ใช้ผลลัพธ์แบบ JSON schema แล้วระบบตรวจสอบก่อนสร้าง/แก้ไฟล์ UTF-8 ไม่รัน shell หรือทดสอบโปรแกรมที่โมเดลสร้าง ไม่เพิ่ม `privileged`/`SYS_ADMIN` หรือปิด seccomp เพื่อข้ามข้อจำกัด Docker ส่วน Claude ใช้เครื่องมืออ่าน/แก้ไฟล์ได้ รายละเอียดและผลทดสอบจริงอยู่ใน `docs/phase2-test-report.md`
+## โครงสร้างโค้ด
+
+```text
+server/
+  migrations/           # ฐานข้อมูลและสิทธิ์
+  src/
+    main.rs             # จุดเริ่มต้น
+    lib.rs              # ประกอบแอปและ routes
+    domain/             # กฎแผนงาน
+    application/        # use cases
+    infrastructure/     # persistence และ semantic retrieval
+    presentation/http/  # HTTP handlers แยกตาม feature
+    worker.rs           # วงจรงานและการเรียก CLI
+    codex_files.rs      # ตรวจและบันทึก structured files
+web/src/
+  application/          # controller และ state
+  features/             # office, tasks, knowledge, team, settings ฯลฯ
+  shared/               # types, API client, fields
+semantic/               # บริการ embedding ภายในเครื่อง
+compose.yaml            # บริการใช้งานจริง
+compose.test.yaml       # ระบบทดสอบแยก
+```
+
+Rust ใช้ structs, `impl` และ composition เพื่อห่อกฎและบริการ React ใช้ function components ร่วมกับ service/engine classes เช่น `OfficeApi` และ `LayoutEngine` ไม่บังคับใช้ inheritance กับทุกส่วน
+
+## การทดสอบ
+
+```sh
+./test.sh
+```
+
+รัน build และทดสอบใน Compose project แยก ใช้ฐานข้อมูล `office_test`, Worker จำลองสองตัว และ volumes ชั่วคราว ไม่ใช้ credential volumes ของระบบจริง ผลตรวจล่าสุด: **37 HTTP integration tests และ 11 Rust unit tests ผ่าน**
+
+Fixture tests ไม่เรียก AI จริง ส่วน live acceptance เคยทดสอบแยกด้วยบัญชีที่เชื่อมและอนุญาตแล้ว ครอบคลุมการสร้างไฟล์ ส่งแก้ ดาวน์โหลด ตรวจรับ และส่งต่อไฟล์ Codex → Claude ดู [รายงานทดสอบ](docs/phase2-test-report.md) และ [ผลตรวจ UI กระดาน](docs/task-board-check.md)
+
+สคริปต์ `tests/probe_live.py` และ `tests/probe_live_team.py` ต้อง opt in ชัดเจนและใช้โควตาบัญชีจริง ไม่รวมอยู่ในชุดทดสอบปกติ
+
+## เอกสารเพิ่มเติม
+
+- [สถาปัตยกรรม สิทธิ์ และขอบเขตความปลอดภัย](docs/architecture.md)
+- [รายงานการทดสอบระบบ](docs/phase2-test-report.md)
+- [ผลตรวจการจัดระเบียบ UI](docs/ui-refinement-check.md)
+- [ผลตรวจหน้ากระดานงาน](docs/task-board-check.md)
+- [ที่มาของภาพและฟอนต์](docs/design/README.md)
+
+ภาพในคู่มือนี้เป็นภาพจากระบบที่ใช้งาน/ทดสอบแล้ว งานใน Workspace ชื่อ Acceptance เป็นงานตรวจระบบ ไม่ใช่ข้อมูลที่จะถูกสร้างให้เมื่อติดตั้งใหม่ ภาพ Settings ไม่แสดงรหัสผ่าน token หรือรหัสยืนยัน
