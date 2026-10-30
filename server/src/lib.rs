@@ -11,6 +11,7 @@ mod model_selection;
 mod monitoring;
 mod organization;
 mod personal_workers;
+mod project_files;
 mod quota;
 mod recruitment;
 mod resource_metrics;
@@ -153,6 +154,7 @@ pub async fn run() {
                 .merge(collaboration::routes())
                 .merge(organization::routes())
                 .merge(model_selection::routes())
+                .merge(project_files::routes())
                 .merge(master_data::routes())
                 .merge(recruitment::routes())
                 .merge(quota::routes())

@@ -33,6 +33,7 @@ pub fn routes() -> Router<App> {
 }
 #[derive(Deserialize)]
 struct ProjectForm {
+    working_folder: Option<Value>,
     name: String,
     #[serde(default)]
     description: String,
@@ -65,12 +66,14 @@ async fn create_project(
     if !valid(&b.name, 100) || b.description.len() > 5000 {
         return Err(bad("Invalid project"));
     }
+    let folder = project_files::validate(u.id, b.working_folder.as_ref()).await?;
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO projects(id,workspace_id,name,description) VALUES($1,$2,$3,$4)")
+    sqlx::query("INSERT INTO projects(id,workspace_id,name,description,working_folder) VALUES($1,$2,$3,$4,$5)")
         .bind(id)
         .bind(wid)
         .bind(b.name.trim())
         .bind(b.description)
+        .bind(folder)
         .execute(&a.db)
         .await?;
     Ok(Json(json!({"id":id})))
@@ -86,7 +89,13 @@ async fn edit_project(
     if !valid(&b.name, 100) || b.description.len() > 5000 {
         return Err(bad("Invalid project"));
     }
-    changed(sqlx::query("UPDATE projects SET name=$1,description=$2,version=version+1 WHERE id=$3 AND workspace_id=$4 AND version=$5 AND deleted_at IS NULL").bind(b.name.trim()).bind(b.description).bind(id).bind(wid).bind(b.version).execute(&a.db).await?.rows_affected())
+    let old:Option<Value>=sqlx::query_scalar("SELECT working_folder FROM projects WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL").bind(id).bind(wid).fetch_one(&a.db).await?;
+    let folder = match b.working_folder.as_ref() {
+        Some(f) if Some(f) != old.as_ref() => project_files::validate(u.id, Some(f)).await?,
+        Some(_) => old,
+        None => old,
+    };
+    changed(sqlx::query("UPDATE projects SET name=$1,description=$2,working_folder=$6,version=version+1 WHERE id=$3 AND workspace_id=$4 AND version=$5 AND deleted_at IS NULL").bind(b.name.trim()).bind(b.description).bind(id).bind(wid).bind(b.version).bind(folder).execute(&a.db).await?.rows_affected())
 }
 async fn project_deleted(
     a: &App,

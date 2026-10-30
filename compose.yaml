@@ -38,6 +38,8 @@ services:
       OWNER_PASSWORD: ${OWNER_PASSWORD:?Run setup first}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       EMBEDDING_ADDR: embeddings:8090
+      PROJECT_BRIDGE_ADDR: host.docker.internal:18089
+      PROJECT_BRIDGE_TOKEN: ${PROJECT_BRIDGE_TOKEN:-}
     volumes: [runs-data:/data:ro, backup-data:/backups:ro]
     depends_on:
       postgres: {condition: service_healthy}
@@ -74,6 +76,8 @@ services:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office
       OWNER_EMAIL: ${OWNER_EMAIL}
       WORKER_ID: local-worker
+      PROJECT_BRIDGE_ADDR: host.docker.internal:18089
+      PROJECT_BRIDGE_TOKEN: ${PROJECT_BRIDGE_TOKEN:-}
       REDIS_URL: redis://redis:6379
     volumes:
       - runs-data:/data

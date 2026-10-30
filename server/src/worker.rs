@@ -276,6 +276,20 @@ impl Drop for GroupGuard {
         }
     }
 }
+pub(crate) fn write_project_snapshot(dir: &FsPath, raw: &str) -> WorkerResult<String> {
+    codex_files::materialize(dir, raw)
+}
+pub(crate) fn prepare_project_dir(dir: &FsPath) -> WorkerResult<()> {
+    let p = dir.join("project");
+    std::fs::create_dir_all(&p)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{chown, PermissionsExt};
+        chown(&p, Some(model_uid()), Some(model_uid()))?;
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
 fn prepare_dir(id: Uuid) -> WorkerResult<PathBuf> {
     let path = FsPath::new("/data/runs").join(id.to_string());
     std::fs::create_dir_all(&path)?;
@@ -309,6 +323,13 @@ async fn restore_revision_files(db: &PgPool, j: &Job, dir: &FsPath) -> WorkerRes
     let root = FsPath::new("/data/runs").join(previous.to_string());
     let mut total = 0u64;
     for (name, size) in &files {
+        if name.starts_with("project/")
+            && j.execution_context
+                .as_ref()
+                .is_some_and(|c| c.get("project_folder").is_some())
+        {
+            continue;
+        }
         if !phase2::safe_relative(name) || *size < 0 || *size > 10 * 1024 * 1024 {
             return Err("Invalid revision artifact".into());
         }
@@ -622,6 +643,16 @@ async fn execute(
     .execute(db)
     .await?;
     if fixture {
+        if j.description.contains("[test:project-files]") {
+            if tokio::fs::read_to_string(dir.join("project/hello.txt")).await?
+                != "EXISTING_PROJECT_FILE"
+            {
+                return Err("Project input missing".into());
+            }
+            tokio::fs::create_dir_all(dir.join("project/src")).await?;
+            tokio::fs::write(dir.join("project/src/agent.txt"), "AGENT_PROJECT_OUTPUT").await?;
+            tokio::fs::write(dir.join("project/hello.txt"), "AGENT_UPDATED_PROJECT_FILE").await?;
+        }
         let start = Instant::now();
         let duration = if j.description.contains("[test:slow]") {
             10.0
@@ -695,7 +726,16 @@ async fn execute(
         }
         let text = format!(
             "FIXTURE TEST ONLY — no AI was called.\n\n{}\n\n{}",
-            j.title, prompt
+            j.title,
+            format!(
+                "{}{}",
+                prompt,
+                if j.description.contains("[test:project-files]") {
+                    "\nEXISTING_PROJECT_FILE"
+                } else {
+                    ""
+                }
+            )
         );
         tokio::fs::write(dir.join("result.md"), &text).await?;
         return Ok(("review".into(), text, String::new()));
@@ -706,10 +746,19 @@ async fn execute(
         .filter_map(|s| Uuid::parse_str(s).ok())
         .map(|id| format!("inputs/{id}/result.md"))
         .collect::<Vec<_>>();
+    let prompt = if j
+        .execution_context
+        .as_ref()
+        .is_some_and(|c| c.get("project_folder").is_some())
+    {
+        format!("{prompt}\nPROJECT FOLDER MODE: Existing project source is in project/. Read and change project files only under project/. These files will be synchronized to the selected host folder after a successful run, with conflict checks. Do not delete, rename, write hidden files or claim shell tests were run. Files outside project/ are task artifacts only.\n")
+    } else {
+        prompt.to_string()
+    };
     let prompt = if j.provider == "codex" {
         format!("{}{}", prompt, codex_files::context(dir, &skip)?)
     } else {
-        prompt.to_string()
+        prompt
     };
     sqlx::query(
         "UPDATE task_runs SET usage_metrics=usage_metrics || $1 WHERE id=$2 AND task_id=$3",
@@ -919,7 +968,13 @@ async fn finish(
     } else {
         (status, error)
     };
-    if status == "review" {
+    if status == "review"
+        || (status == "failed"
+            && !result.is_empty()
+            && j.execution_context
+                .as_ref()
+                .is_some_and(|c| c.get("project_folder").is_some()))
+    {
         collect_files(dir, dir, &mut files, &mut total, 0)?;
         if model_uid() != 10001 {
             let status = Command::new("setfacl")
@@ -1062,7 +1117,14 @@ pub async fn run_worker() -> WorkerResult<()> {
             } else {
                 providers.claude.authenticated
             };
-            let outcome = if !authenticated {
+            let snapshot =
+                crate::project_files::Snapshot::prepare(j.execution_context.as_ref(), &dir).await;
+            if matches!(&snapshot, Ok(Some(_))) {
+                phase2::event(&db, j.id, Some(run), "Prepared project snapshot").await?;
+            }
+            let mut outcome = if snapshot.is_err() {
+                ("failed".into(),String::new(),"Project folder unavailable or exceeds the text-file limit; no AI call was made".into())
+            } else if !authenticated {
                 (
                     "waiting_auth".into(),
                     String::new(),
@@ -1097,6 +1159,25 @@ pub async fn run_worker() -> WorkerResult<()> {
                     },
                 }
             };
+            if outcome.0 == "review" {
+                if let Ok(Some(snapshot)) = snapshot {
+                    match snapshot.publish(&dir).await {
+                        Ok(count) => {
+                            phase2::event(
+                                &db,
+                                j.id,
+                                Some(run),
+                                &format!("Saved {count} changed files to project folder"),
+                            )
+                            .await?;
+                        }
+                        Err(_) => {
+                            outcome.0 = "failed".into();
+                            outcome.2="Project publication stopped: original files changed, the folder moved, or a path is unsafe. Output is retained in task artifacts; review before retrying".into();
+                        }
+                    }
+                }
+            }
             finish(&db, &j, run, &outcome.0, &outcome.1, &outcome.2, &dir).await?;
         } else {
             tokio::time::sleep(Duration::from_secs(2)).await;

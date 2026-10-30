@@ -157,3 +157,26 @@
     flex: 1;
   }
 }
+
+.project-folder-picker {
+  border: 1px solid #d8cbb6;
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  background: #f9f6ef;
+}
+.project-folder-picker p {
+  margin: 0;
+}
+.project-folder-path {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #6c6255;
+}
+.project-folder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
