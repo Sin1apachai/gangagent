@@ -1,0 +1,12 @@
+{
+  "real_proc_cgroup_filesystem_values": true,
+  "per_admin_read_state_isolated": true,
+  "settings_survive_app_restart": true,
+  "redis_outage_keeps_vm_metrics_fresh": true,
+  "missing_metric_does_not_resolve_active_warning": true,
+  "redis_return_recovers_warning": true,
+  "stale_sample_is_flagged": true,
+  "preview_low_threshold_warning_ready": true,
+  "model_calls": 0,
+  "scope": "Docker VM and containers, not physical macOS host"
+}

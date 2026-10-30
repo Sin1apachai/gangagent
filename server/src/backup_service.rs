@@ -9,7 +9,8 @@ use tokio::{io::AsyncReadExt, process::Command};
 type BResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 const MAX_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 async fn beat(db: &PgPool) -> BResult<()> {
-    sqlx::query("UPDATE backup_service SET heartbeat_at=now() WHERE id")
+    sqlx::query("UPDATE backup_service SET heartbeat_at=now(),resources=$1 WHERE id")
+        .bind(crate::resource_metrics::node())
         .execute(db)
         .await?;
     Ok(())

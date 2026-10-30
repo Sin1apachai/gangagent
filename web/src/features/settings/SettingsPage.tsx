@@ -1,5 +1,7 @@
+import { ResourcePanel } from "../monitoring/ResourcePanel";
+import type { ResourceController } from "../monitoring/useResourceMonitor";
 import { Backups } from "./Backups";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FormTabs } from "../../shared/FormTabs";
 import { PersonalWorkers } from "./PersonalWorkers";
 import type {
@@ -20,8 +22,17 @@ import { Field, Area } from "../../shared/Fields";
 import { furniture, statusLabel } from "../../shared/constants";
 import { Office } from "../office/Office";
 import type { OfficeController } from "../../application/useOfficeController";
-export function SettingsPage({ ctx }: { ctx: OfficeController }) {
+export function SettingsPage({
+  ctx,
+  resources,
+}: {
+  ctx: OfficeController;
+  resources?: ResourceController;
+}) {
   const [settingsTab, setSettingsTab] = useState("connections");
+  useEffect(() => {
+    if (resources?.openRequest) setSettingsTab("resources");
+  }, [resources?.openRequest]);
   const {
     user,
     setUser,
@@ -100,6 +111,7 @@ export function SettingsPage({ ctx }: { ctx: OfficeController }) {
                   : []),
                 ...(user.is_super_admin
                   ? [
+                      { id: "resources", label: "ทรัพยากร" },
                       { id: "backups", label: "สำรองข้อมูล" },
                       { id: "users", label: "ผู้ใช้ระบบ" },
                     ]
@@ -541,6 +553,9 @@ export function SettingsPage({ ctx }: { ctx: OfficeController }) {
             </section>
           )}
           {settingsTab === "connections" && <PersonalWorkers />}
+          {user.is_super_admin && settingsTab === "resources" && resources && (
+            <ResourcePanel monitor={resources} />
+          )}
           {user.is_super_admin && settingsTab === "backups" && <Backups />}
         </div>
       )}

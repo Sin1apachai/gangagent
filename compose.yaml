@@ -25,7 +25,11 @@ services:
     restart: unless-stopped
   app:
     image: agent-office-local:latest
-    build: {context: ., target: runtime}
+    build:
+      context: .
+      target: runtime
+      args:
+        RUNTIME_BASE: ${OFFICE_RUNTIME_BASE:-debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3}
     ports: ["127.0.0.1:${OFFICE_PORT:-8088}:8080"]
     environment:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office

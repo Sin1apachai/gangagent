@@ -230,7 +230,7 @@ async fn heartbeat(db: &PgPool, uid: Uuid, id: &str, fixture: bool) -> WorkerRes
         status.authenticated = false;
         status.method = "reauth_required".into();
     }
-    sqlx::query("INSERT INTO workers(id,user_id,mode,providers) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET user_id=EXCLUDED.user_id,mode=EXCLUDED.mode,providers=EXCLUDED.providers,heartbeat_at=now()").bind(id).bind(uid).bind(if fixture{"fixture"}else{"subscription_cli"}).bind(json!(p)).execute(db).await?;
+    sqlx::query("INSERT INTO workers(id,user_id,mode,providers,resources) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET user_id=EXCLUDED.user_id,mode=EXCLUDED.mode,providers=EXCLUDED.providers,resources=EXCLUDED.resources,heartbeat_at=now()").bind(id).bind(uid).bind(if fixture{"fixture"}else{"subscription_cli"}).bind(json!(p)).bind(crate::resource_metrics::node()).execute(db).await?;
     Ok(p)
 }
 async fn bounded_read<R: tokio::io::AsyncRead + Unpin>(mut reader: R) -> Vec<u8> {
@@ -554,8 +554,9 @@ fn bounded_revision(value: &str) -> String {
 }
 async fn renew(db: &PgPool, job: Uuid, run: Uuid, worker: &str) -> WorkerResult<bool> {
     let cancel:Option<bool>=sqlx::query_scalar("UPDATE tasks SET lease_until=now()+interval '20 seconds' WHERE id=$1 AND current_run_id=$2 AND status='running' AND deleted_at IS NULL RETURNING cancel_requested OR NOT EXISTS(SELECT 1 FROM users u JOIN workspaces w ON w.id=tasks.workspace_id JOIN provider_connections c ON c.user_id=u.id AND c.provider=tasks.provider WHERE u.id=tasks.created_by AND u.deleted_at IS NULL AND w.deleted_at IS NULL AND c.enabled AND c.billing_acknowledged AND (u.is_super_admin OR EXISTS(SELECT 1 FROM memberships m WHERE m.workspace_id=w.id AND m.user_id=u.id AND m.role IN ('owner','member'))))").bind(job).bind(run).fetch_optional(db).await?;
-    sqlx::query("UPDATE workers SET heartbeat_at=now() WHERE id=$1")
+    sqlx::query("UPDATE workers SET heartbeat_at=now(),resources=$2 WHERE id=$1")
         .bind(worker)
+        .bind(crate::resource_metrics::node())
         .execute(db)
         .await?;
     Ok(cancel.unwrap_or(true))

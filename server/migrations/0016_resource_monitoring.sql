@@ -1,0 +1,12 @@
+ALTER TABLE workers ADD COLUMN resources jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE backup_service ADD COLUMN resources jsonb NOT NULL DEFAULT '{}'::jsonb;
+CREATE TABLE resource_settings(id boolean PRIMARY KEY DEFAULT true CHECK(id),version integer NOT NULL DEFAULT 0,settings jsonb NOT NULL,updated_by uuid REFERENCES users(id),updated_at timestamptz NOT NULL DEFAULT now());
+INSERT INTO resource_settings(id,settings) VALUES(true, '{"hold_seconds": 15, "recovery_margin": 5, "rules": {"vm_cpu": {"enabled": true, "threshold_percent": 85}, "vm_memory": {"enabled": true, "threshold_percent": 85}, "data_disk": {"enabled": true, "threshold_percent": 90}, "backup_disk": {"enabled": false, "threshold_percent": 90}, "app_memory": {"enabled": false, "threshold_percent": 90}, "redis_memory": {"enabled": true, "threshold_percent": 85}, "worker_memory": {"enabled": true, "threshold_percent": 90}}}');
+CREATE TABLE resource_state(id boolean PRIMARY KEY DEFAULT true CHECK(id),sample jsonb NOT NULL,evaluation jsonb NOT NULL,collected_at timestamptz NOT NULL);
+CREATE TABLE resource_notifications(id uuid PRIMARY KEY,resource_key text NOT NULL,kind text NOT NULL CHECK(kind IN ('warning','recovery')),label text NOT NULL,value_percent double precision,threshold_percent double precision NOT NULL,reason text NOT NULL DEFAULT 'threshold',created_at timestamptz NOT NULL DEFAULT now(),resolved_at timestamptz);
+CREATE UNIQUE INDEX one_resource_warning ON resource_notifications(resource_key) WHERE kind='warning' AND resolved_at IS NULL;
+CREATE TABLE resource_notification_reads(user_id uuid REFERENCES users(id),notification_id uuid REFERENCES resource_notifications(id) ON DELETE CASCADE,read_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(user_id,notification_id));
+ALTER TABLE resource_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resource_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resource_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resource_notification_reads ENABLE ROW LEVEL SECURITY;

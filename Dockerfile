@@ -1,3 +1,4 @@
+ARG RUNTIME_BASE=debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 FROM node:22-bookworm-slim AS web-build
 WORKDIR /web
 COPY web/package*.json ./
@@ -10,8 +11,9 @@ WORKDIR /build
 COPY server/ ./
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/build/target cargo build --locked --release && cargo test --locked --release && cp target/release/agent-office /build/agent-office-bin
 
-FROM debian:bookworm-slim AS runtime
-RUN useradd --system --uid 10001 office
+FROM ${RUNTIME_BASE} AS runtime
+USER root
+RUN id -u office >/dev/null 2>&1 || useradd --system --uid 10001 office
 WORKDIR /app
 COPY --from=rust-build /build/agent-office-bin /app/agent-office
 COPY --from=web-build /web/dist /app/web

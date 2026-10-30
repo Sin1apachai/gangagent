@@ -26,7 +26,7 @@ services:
     restart: "no"
   worker:
     image: agent-office-local:latest
-    build: {context: ., target: runtime}
+    build: !reset null
     environment:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
       WORKER_MODE: fixture

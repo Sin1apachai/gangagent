@@ -9,6 +9,7 @@ dependencies = [
  "argon2",
  "axum",
  "futures-util",
+ "libc",
  "rand",
  "redis",
  "serde",

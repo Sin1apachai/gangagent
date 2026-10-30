@@ -19,6 +19,7 @@
 | **โครงสร้างทีม** | Org Chart ตามสายรายงาน ฝ่าย หน้าที่ ขอบเขตตัดสินใจ และ Skill ของแต่ละ Agent |
 | **Workflow** | แม่แบบ 1–8 ขั้น งานคู่ขนาน/รวมผล Skill ที่จำเป็น ไฟล์บังคับ และผู้ตรวจรับ สร้างร่างแผนก่อนอนุมัติ |
 | **Team** | เพิ่ม Agent กำหนดบทบาท คำสั่ง ผู้ให้บริการ ตำแหน่ง และตัวละคร 12 แบบ |
+| **Monitoring** | CPU/RAM/พื้นที่คงเหลือ ตั้งเกณฑ์แจ้งเตือน และกระดิ่งขวาบนสำหรับ Super Admin |
 | **Settings** | เชื่อมบัญชี AI ผ่านเว็บ จัดการโปรไฟล์ สมาชิก สิทธิ์ และ Worker ส่วนตัว |
 | **Trash** | กู้คืน Workspace งาน Agent และความรู้ที่ย้ายไปถังขยะ |
 
@@ -352,3 +353,15 @@ exact artifact checks passing, but **28.53% longer summed provider time**. This 
 one paired workflow, not a general saving guarantee or Pro quota measurement.
 No paid embeddings/API service was added. Lexical retrieval has limited synonym
 and Thai segmentation support; pin essential sources and retain human review.
+
+## ดูทรัพยากรและตั้งการแจ้งเตือน
+
+เข้าสู่ระบบด้วย Super Admin แล้วเปิด **Settings → ทรัพยากร** เพื่อดูค่าปัจจุบันและทรัพยากรที่ใช้ได้อีก อัปเดตทุก 5 วินาที เลือกเปิดเกณฑ์แต่ละรายการ ระบุเปอร์เซ็นต์ที่ใช้ไป ระยะเวลาที่ต้องเกินต่อเนื่อง และระยะเผื่อกลับปกติ แล้วกด **บันทึกเกณฑ์แจ้งเตือน**
+
+กระดิ่งขวาบนแสดงรายการยังไม่อ่านและสถานะเตือน พร้อมข้อความเมื่อเกิดเหตุหรือกลับปกติ กดอ่านแล้วไม่ได้ทำให้ปัญหาทรัพยากรหายไป เกณฑ์และประวัติอยู่ใน PostgreSQL จึงยังอยู่หลังรีสตาร์ต หากข้อมูลขาดหายระบบจะไม่แสดงว่ากลับปกติโดยไม่มีหลักฐาน
+
+ค่าที่แสดงเป็นของ **Docker Linux VM และคอนเทนเนอร์** ซึ่งอาจใช้ร่วมกับแอปอื่น ไม่ใช่ทรัพยากรทั้งเครื่อง macOS ระบบนี้ไม่เรียก AI ไม่ใช้ Docker socket และไม่ต้องสมัครบริการเพิ่ม ค่าเริ่มต้นเตือน CPU/RAM VM และ Redis ที่ 85%, พื้นที่ผลงาน/Worker RAM ที่ 90%, เกินต่อเนื่อง 15 วินาที และเผื่อกลับปกติ 5 จุดเปอร์เซ็นต์
+
+![หน้าทรัพยากร](docs/images/resource-monitoring.jpg)
+
+ดู [รายงานการทดสอบและข้อจำกัด](docs/resource-monitoring-report.md) และ [ตัวอย่างรายการแจ้งเตือน](docs/images/resource-notifications.jpg)

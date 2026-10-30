@@ -1,3 +1,5 @@
+import { useResourceMonitor } from "./features/monitoring/useResourceMonitor";
+import { ResourceBell } from "./features/monitoring/ResourceBell";
 import { PersonnelPage } from "./features/personnel/PersonnelPage";
 import { OrganizationPage } from "./features/organization/OrganizationPage";
 import { CollaborationPage } from "./features/collaboration/CollaborationPage";
@@ -30,6 +32,9 @@ import { furniture, statusLabel } from "./shared/constants";
 import { Office } from "./features/office/Office";
 export default function App() {
   const controller = useOfficeController();
+  const resourceMonitor = useResourceMonitor(
+    controller.user?.is_super_admin ? controller.user.id : null,
+  );
   const {
     user,
     setUser,
@@ -245,6 +250,12 @@ export default function App() {
             {data?.name ?? (wid ? "กำลังโหลด…" : "ยังไม่มี Workspace")}
           </div>
           <div className="header-right">
+            {user.is_super_admin && (
+              <ResourceBell
+                monitor={resourceMonitor}
+                onOpenSettings={() => setPage("settings")}
+              />
+            )}
             <span className="connection">
               <i />
               {online ? "Worker ออนไลน์" : "Worker ออฟไลน์"}
@@ -365,7 +376,7 @@ export default function App() {
           <TeamPage ctx={controller} />
           <PersonnelPage ctx={controller} />
           <OrganizationPage ctx={controller} />
-          <SettingsPage ctx={controller} />
+          <SettingsPage ctx={controller} resources={resourceMonitor} />
           <TrashPage ctx={controller} />
         </div>
         <footer>
