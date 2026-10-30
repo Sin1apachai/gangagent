@@ -19,4 +19,4 @@ Machine-readable evidence: [visual-room-builder-proof.json](measurements/visual-
 
 ![Visual builder with two saved rooms](images/visual-room-builder.jpg)
 
-This release supports rectangular rooms with one door each, not arbitrary polygonal walls or multiple floors. Geometry tools use pointer/touch gestures. Name/department edits are optional; the generated room name supports creation without typing anything. Existing room purpose text is retained internally when manipulating an old room, but its input is removed from the builder.
+This release supports rectangular rooms with one door each, not arbitrary polygonal walls or multiple floors. Geometry tools use pointer/touch gestures. Name/department edits are optional; the generated room name supports creation without typing anything. Migration 0019 subsequently removes the retired room-purpose property; see the [schema audit](schema-audit.md).

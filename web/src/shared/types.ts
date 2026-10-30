@@ -11,7 +11,6 @@ export type Room = {
   id: string;
   name: string;
   department: string;
-  purpose: string;
   x: number;
   y: number;
   width: number;

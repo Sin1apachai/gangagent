@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {RoomDraft} from '../src/features/office/domain/RoomDraft.ts';
 import {RoomEngine} from '../src/features/office/domain/RoomEngine.ts';
-const room={id:'eng',name:'Engineering',department:'Engineering',purpose:'',x:1,y:1,width:6,height:5,door_side:'south',door_offset:2};
+const room={id:'eng',name:'Engineering',department:'Engineering',x:1,y:1,width:6,height:5,door_side:'south',door_offset:2};
 test('dragging either direction creates the same inclusive rectangle',()=>{
  const a=RoomDraft.rectangle({x:1,y:1},{x:6,y:5},room),b=RoomDraft.rectangle({x:6,y:5},{x:1,y:1},room);assert.deepEqual(a,b);assert.equal(a.width,6);assert.equal(a.height,5);assert.equal(new RoomEngine([a]).validate([]),'');
 });

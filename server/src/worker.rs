@@ -1028,7 +1028,7 @@ pub async fn run_worker() -> WorkerResult<()> {
                 .bind(j.id)
                 .execute(&mut *tx)
                 .await?;
-            sqlx::query("INSERT INTO task_runs(id,task_id,worker_id,status,prompt,usage_metrics) VALUES($1,$2,$3,'running',$4,$5)").bind(run).bind(j.id).bind(&id).bind(&p).bind(context_metrics).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO task_runs(id,task_id,worker_id,status,usage_metrics) VALUES($1,$2,$3,'running',$4)").bind(run).bind(j.id).bind(&id).bind(context_metrics).execute(&mut *tx).await?;
             tx.commit().await?;
             phase2::event(&db, j.id, Some(run), "Worker claimed task").await?;
             let authenticated = if j.provider == "codex" {

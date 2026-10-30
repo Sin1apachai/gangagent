@@ -423,3 +423,7 @@ and Thai segmentation support; pin essential sources and retain human review.
 ![เครื่องมือวาดห้องและวางประตูบนภาพ](docs/images/visual-room-builder.jpg)
 
 [หลักฐานการทดสอบเครื่องมือวาดห้อง](docs/visual-room-builder-report.md)
+
+## การปรับ schema
+
+ระบบใช้ migration ตามเวอร์ชัน ข้อมูลรูปห้องยังจำเป็นต่อแผนที่ แต่ฟิลด์หน้าที่ห้องจากฟอร์มเดิมและสำเนา prompt เต็มที่ไม่มีส่วนอ่านใช้งานถูกนำออกแล้ว ผลลัพธ์งาน ตัวชี้วัด token และข้อมูลบัญชียังคงอยู่ ดู [รายงานตรวจ schema และผลทดสอบ](docs/schema-audit.md)

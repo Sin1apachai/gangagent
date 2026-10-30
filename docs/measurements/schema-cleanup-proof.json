@@ -1,0 +1,19 @@
+{
+  "upgrade_from_schema_18_verified": true,
+  "retired_room_purpose_removed": true,
+  "room_order_geometry_and_other_workspace_data_preserved": true,
+  "layout_version_incremented_for_stale_editors": true,
+  "task_run_prompt_column_removed": true,
+  "execution_results_usage_and_other_run_fields_preserved": true,
+  "agent_xy_columns_absent": true,
+  "model_calls": 0,
+  "production_columns_removed_verified": true,
+  "production_retired_room_properties_absent": true,
+  "production_stable_domain_tables_preserved": 29,
+  "application_tables_audited": 37,
+  "sqlx_migration_table_retained": true,
+  "app_worker_backup_binaries_match": true,
+  "http_tests_passed": 86,
+  "rust_tests_passed": 29,
+  "frontend_tests_passed": 13
+}

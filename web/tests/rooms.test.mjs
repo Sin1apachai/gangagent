@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {RoomEngine} from '../src/features/office/domain/RoomEngine.ts';
 import {LayoutEngine} from '../src/features/office/domain/LayoutEngine.ts';
-const room={id:'eng',name:'Engineering',department:'Engineering',purpose:'Build',x:0,y:0,width:6,height:5,door_side:'south',door_offset:2};
+const room={id:'eng',name:'Engineering',department:'Engineering',x:0,y:0,width:6,height:5,door_side:'south',door_offset:2};
 test('walls force a route through the door instead of walking through boundaries',()=>{
  const e=new LayoutEngine([], [room]);const path=e.path({x:1,y:2},{x:9,y:2});assert.ok(path.length>1);
  assert.ok(path.some((p,n)=>n>0&&p.x===2&&p.y===5&&path[n-1].x===2&&path[n-1].y===4));

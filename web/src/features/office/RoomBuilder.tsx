@@ -106,7 +106,6 @@ export function RoomBuilder({
       id: crypto.randomUUID(),
       name: `ห้อง ${n}`,
       department: "",
-      purpose: "",
       x: 0,
       y: 0,
       width: 3,

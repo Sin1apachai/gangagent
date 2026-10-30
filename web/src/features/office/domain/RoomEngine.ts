@@ -74,8 +74,7 @@ export class RoomEngine {
         ids.has(r.id) ||
         !r.name.trim() ||
         new TextEncoder().encode(r.name).length > 100 ||
-        new TextEncoder().encode(r.department).length > 100 ||
-        new TextEncoder().encode(r.purpose).length > 500
+        new TextEncoder().encode(r.department).length > 100
       )
         return "ชื่อห้อง/ฝ่าย/หน้าที่ไม่ถูกต้องหรือยาวเกินไป";
       ids.add(r.id);

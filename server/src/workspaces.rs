@@ -79,7 +79,6 @@ pub(crate) struct Room {
     id: String,
     name: String,
     department: String,
-    purpose: String,
     x: i32,
     y: i32,
     width: i32,
@@ -165,7 +164,6 @@ pub(crate) fn valid_layout(l: &Layout) -> bool {
             || !room_ids.insert(&r.id)
             || !valid(&r.name, 100)
             || r.department.len() > 100
-            || r.purpose.len() > 500
             || r.width < 3
             || r.width > 20
             || r.height < 3

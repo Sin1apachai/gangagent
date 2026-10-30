@@ -9,7 +9,7 @@ class Rooms(unittest.TestCase):
   self.wid=self.ok(call(self.admin,'/workspaces',{'name':'Room test '+uuid.uuid4().hex}))['id'];self.path='/workspaces/'+self.wid
  def snap(self):return self.ok(call(self.admin,self.path))
  def save(self,rooms,items=None,version=None,c=None):return call(c or self.admin,self.path+'/layout',{'version':self.snap()['layout_version'] if version is None else version,'layout':{'items':items or [],'rooms':rooms}},'PUT')
- def room(self,**kw):return {'id':'engineering','name':'Engineering room','department':'Engineering','purpose':'Build and review','x':0,'y':0,'width':6,'height':5,'door_side':'south','door_offset':2,**kw}
+ def room(self,**kw):return {'id':'engineering','name':'Engineering room','department':'Engineering','x':0,'y':0,'width':6,'height':5,'door_side':'south','door_offset':2,**kw}
  def test_multiple_rooms_create_edit_remove_and_optimistic_conflict(self):
   rooms=[self.room(),self.room(id='design',name='Design room',department='Design',x=8,width=5)]
   self.ok(self.save(rooms));self.assertEqual(self.snap()['layout']['rooms'],rooms)
