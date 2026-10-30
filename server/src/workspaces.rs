@@ -74,8 +74,49 @@ pub(crate) struct Item {
     pub(crate) rotation: i32,
 }
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Room {
+    id: String,
+    name: String,
+    department: String,
+    purpose: String,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    door_side: String,
+    door_offset: i32,
+}
+impl Room {
+    fn contains(&self, x: i32, y: i32) -> bool {
+        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
+    }
+    fn door(&self) -> ((i32, i32), (i32, i32)) {
+        match self.door_side.as_str() {
+            "north" => (
+                (self.x + self.door_offset, self.y),
+                (self.x + self.door_offset, self.y - 1),
+            ),
+            "south" => (
+                (self.x + self.door_offset, self.y + self.height - 1),
+                (self.x + self.door_offset, self.y + self.height),
+            ),
+            "west" => (
+                (self.x, self.y + self.door_offset),
+                (self.x - 1, self.y + self.door_offset),
+            ),
+            _ => (
+                (self.x + self.width - 1, self.y + self.door_offset),
+                (self.x + self.width, self.y + self.door_offset),
+            ),
+        }
+    }
+}
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct Layout {
     pub(crate) items: Vec<Item>,
+    #[serde(default)]
+    pub(crate) rooms: Vec<Room>,
 }
 #[derive(Deserialize)]
 pub(crate) struct LayoutInput {
@@ -88,8 +129,13 @@ pub(crate) fn valid_layout(l: &Layout) -> bool {
     }
     let mut cells = std::collections::HashSet::new();
     let mut ids = std::collections::HashSet::new();
-    l.items.iter().all(|i| {
-        if !valid(&i.id, 80) || !ids.insert(&i.id) || !matches!(i.rotation, 0 | 90 | 180 | 270) {
+    let furniture_valid = l.items.iter().all(|i| {
+        if !(0..20).contains(&i.x)
+            || !(0..12).contains(&i.y)
+            || !valid(&i.id, 80)
+            || !ids.insert(&i.id)
+            || !matches!(i.rotation, 0 | 90 | 180 | 270)
+        {
             return false;
         }
         let (mut w, mut h) = match i.kind.as_str() {
@@ -108,7 +154,82 @@ pub(crate) fn valid_layout(l: &Layout) -> bool {
                     && cells.insert((i.x + dx, i.y + dy))
             })
         })
-    })
+    });
+    if !furniture_valid || l.rooms.len() > 20 {
+        return false;
+    }
+    let mut room_ids = std::collections::HashSet::new();
+    let mut departments = std::collections::HashSet::new();
+    for (index, r) in l.rooms.iter().enumerate() {
+        if !valid(&r.id, 80)
+            || !room_ids.insert(&r.id)
+            || !valid(&r.name, 100)
+            || r.department.len() > 100
+            || r.purpose.len() > 500
+            || r.width < 3
+            || r.width > 20
+            || r.height < 3
+            || r.height > 12
+            || r.x < 0
+            || r.y < 0
+            || r.x > 20 - r.width
+            || r.y > 12 - r.height
+            || !matches!(r.door_side.as_str(), "north" | "south" | "east" | "west")
+        {
+            return false;
+        }
+        if !r.department.trim().is_empty()
+            && !departments.insert(r.department.trim().to_lowercase())
+        {
+            return false;
+        }
+        let length = if matches!(r.door_side.as_str(), "north" | "south") {
+            r.width
+        } else {
+            r.height
+        };
+        if r.door_offset < 0 || r.door_offset >= length {
+            return false;
+        }
+        let (inside, outside) = r.door();
+        if outside.0 < 0
+            || outside.0 >= 20
+            || outside.1 < 0
+            || outside.1 >= 12
+            || cells.contains(&inside)
+            || cells.contains(&outside)
+        {
+            return false;
+        }
+        for other in &l.rooms[..index] {
+            // Keep a one-tile shared corridor between rooms.
+            if r.x <= other.x + other.width
+                && other.x <= r.x + r.width
+                && r.y <= other.y + other.height
+                && other.y <= r.y + r.height
+            {
+                return false;
+            }
+        }
+        for i in &l.items {
+            let (mut w, mut h) = match i.kind.as_str() {
+                "desk" | "sofa" | "bookshelf" | "board" => (2, 1),
+                "meeting" | "rug" => (3, 2),
+                _ => (1, 1),
+            };
+            if i.rotation % 180 != 0 {
+                std::mem::swap(&mut w, &mut h);
+            }
+            let n = (0..w)
+                .flat_map(|dx| (0..h).map(move |dy| (i.x + dx, i.y + dy)))
+                .filter(|(x, y)| r.contains(*x, *y))
+                .count();
+            if n > 0 && n != (w * h) as usize {
+                return false;
+            }
+        }
+    }
+    true
 }
 pub(crate) async fn layout(
     State(a): State<App>,
@@ -119,7 +240,9 @@ pub(crate) async fn layout(
     let u = user(&a, &h).await?;
     access(&a, &u, wid, true).await?;
     if !valid_layout(&b.layout) {
-        return Err(bad("Invalid layout or overlapping furniture"));
+        return Err(bad(
+            "Invalid layout: check room spacing, doors and furniture",
+        ));
     }
     let version:Option<i32>=sqlx::query_scalar("UPDATE workspaces SET layout=$1,layout_version=layout_version+1 WHERE id=$2 AND layout_version=$3 RETURNING layout_version").bind(sqlx::types::Json(b.layout)).bind(wid).bind(b.version).fetch_optional(&a.db).await?;
     match version {

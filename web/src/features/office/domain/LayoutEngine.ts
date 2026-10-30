@@ -1,3 +1,5 @@
+import { RoomEngine } from "./RoomEngine.ts";
+import type { Room } from "../../../shared/types";
 import type { Furniture } from "../../../shared/types";
 export const catalog: Record<
   string,
@@ -18,7 +20,12 @@ export const catalog: Record<
 };
 export type Cell = { x: number; y: number };
 export class LayoutEngine {
-  constructor(readonly items: readonly Furniture[]) {}
+  items: readonly Furniture[];
+  rooms: readonly Room[];
+  constructor(items: readonly Furniture[], rooms: readonly Room[] = []) {
+    this.items = items;
+    this.rooms = rooms;
+  }
   static dimensions(i: Furniture) {
     const c = catalog[i.kind] ?? catalog.plant;
     return i.rotation % 180 ? { w: c.h, h: c.w } : { w: c.w, h: c.h };
@@ -50,7 +57,10 @@ export class LayoutEngine {
       )
     )
       return "ทับเฟอร์นิเจอร์ชิ้นอื่น";
-    return "";
+    return new RoomEngine(this.rooms).validate([
+      ...this.items.filter((o) => o.id !== i.id),
+      i,
+    ]);
   }
   walkable(c: Cell) {
     return (
@@ -65,14 +75,19 @@ export class LayoutEngine {
       )
     );
   }
-  nearest(c: Cell): Cell {
+  nearest(c: Cell, room?: Room, common = false): Cell {
     let best: Cell = { x: 0, y: 0 },
       distance = Infinity;
     for (let y = 0; y < 12; y++)
       for (let x = 0; x < 20; x++) {
         const p = { x, y },
           d = Math.abs(c.x - x) + Math.abs(c.y - y);
-        if (this.walkable(p) && d < distance) {
+        if (
+          this.walkable(p) &&
+          (!room || RoomEngine.contains(room, x, y)) &&
+          (!common || !this.rooms.some((r) => RoomEngine.contains(r, x, y))) &&
+          d < distance
+        ) {
           distance = d;
           best = p;
         }
@@ -102,7 +117,11 @@ export class LayoutEngine {
         { x: c.x, y: c.y - 1 },
       ]) {
         const k = `${p.x},${p.y}`;
-        if (this.walkable(p) && !seen.has(k)) {
+        if (
+          this.walkable(p) &&
+          !seen.has(k) &&
+          !this.rooms.some((r) => RoomEngine.crosses(r, c, p))
+        ) {
           seen.set(k, c);
           queue.push(p);
         }

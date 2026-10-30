@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import type {
   Furniture,
+  Room,
   Agent,
   Task,
   Note,
@@ -25,6 +26,7 @@ export function useOfficeController() {
     [page, setPage] = useState("office"),
     [edit, setEdit] = useState(false),
     [items, setItems] = useState<Furniture[]>([]),
+    [rooms, setRooms] = useState<Room[]>([]),
     [tool, setTool] = useState("desk"),
     [query, setQuery] = useState("");
   const [modal, setModal] = useState<Modal | null>(null),
@@ -67,7 +69,10 @@ export function useOfficeController() {
     const d = await api<Snapshot>("/workspaces/" + id);
     if (active.current === id) {
       setData(d);
-      if (!edit) setItems(d.layout.items);
+      if (!edit) {
+        setItems(d.layout.items);
+        setRooms(d.layout.rooms ?? []);
+      }
     }
   }
   async function extras() {
@@ -122,6 +127,7 @@ export function useOfficeController() {
           if (active.current === wid) {
             setData(d);
             setItems(d.layout.items);
+            setRooms(d.layout.rooms ?? []);
           }
         })
         .catch((e) => setError(e.message));
@@ -146,7 +152,12 @@ export function useOfficeController() {
     return () => clearInterval(t);
   }, [user?.id, wid, edit, detail?.task.id]);
   const dirty =
-    edit && JSON.stringify(items) !== JSON.stringify(data?.layout.items ?? []);
+    edit &&
+    JSON.stringify({ items, rooms }) !==
+      JSON.stringify({
+        items: data?.layout.items ?? [],
+        rooms: data?.layout.rooms ?? [],
+      });
   useEffect(() => {
     const fn = (e: BeforeUnloadEvent) => {
       if (dirty) e.preventDefault();
@@ -214,6 +225,8 @@ export function useOfficeController() {
     setEdit,
     items,
     setItems,
+    rooms,
+    setRooms,
     tool,
     setTool,
     query,

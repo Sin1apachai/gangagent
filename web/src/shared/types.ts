@@ -7,6 +7,18 @@ export type Personality = {
   basis: string;
   traits: { id: string; name: string; instructions: string; caution: string }[];
 };
+export type Room = {
+  id: string;
+  name: string;
+  department: string;
+  purpose: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  door_side: "north" | "south" | "east" | "west";
+  door_offset: number;
+};
 export type Furniture = {
   id: string;
   kind: string;
@@ -93,7 +105,7 @@ export type Snapshot = {
   id: string;
   name: string;
   version: number;
-  layout: { items: Furniture[] };
+  layout: { items: Furniture[]; rooms?: Room[] };
   layout_version: number;
   tasks: Task[];
   knowledge: Note[];

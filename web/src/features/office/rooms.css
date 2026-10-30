@@ -1,0 +1,137 @@
+.rooms-panel {
+  margin: 20px 0;
+  padding: 22px;
+  border: 1px solid #bbb2a0;
+  background: #fbf7ee;
+}
+.rooms-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+.rooms-heading h3 {
+  margin: 0 0 8px;
+}
+.rooms-heading p,
+.room-form p {
+  line-height: 1.7;
+  color: #685f53;
+}
+.room-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.room-card {
+  padding: 18px;
+  border: 1px solid #c7bdab;
+  background: #fffaf1;
+}
+.room-card-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.room-card h4 {
+  margin: 0;
+}
+.room-card p {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.room-swatch {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid #786e60;
+}
+.room-color-0 {
+  background: #8aab9c;
+}
+.room-color-1 {
+  background: #bda4ce;
+}
+.room-color-2 {
+  background: #d9b779;
+}
+.room-color-3 {
+  background: #8fb5c7;
+}
+.room-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  align-items: center;
+}
+.room-actions span {
+  font-size: 13px;
+  flex-basis: 100%;
+}
+.room-form {
+  border-top: 1px solid #c7bdab;
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.room-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.room-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-weight: 600;
+}
+.room-fields input,
+.room-fields select,
+.room-fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px;
+  min-height: 44px;
+}
+.room-fields textarea {
+  min-height: 85px;
+  resize: vertical;
+}
+.room-wide {
+  grid-column: 1/-1;
+}
+.room-empty {
+  padding: 20px;
+  border: 1px dashed #c7bdab;
+  line-height: 1.7;
+}
+.room-error {
+  color: #a03934;
+}
+.office-edit-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+}
+.office-edit-tabs [aria-selected="true"] {
+  background: #29463d;
+  color: #fffaf1;
+}
+.rooms-panel .muted {
+  line-height: 1.8;
+  margin-top: 18px;
+}
+@media (max-width: 640px) {
+  .room-fields {
+    grid-template-columns: 1fr;
+  }
+  .rooms-heading {
+    flex-direction: column;
+  }
+  .rooms-panel {
+    padding: 16px;
+  }
+}

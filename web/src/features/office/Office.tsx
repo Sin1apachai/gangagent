@@ -1,6 +1,7 @@
+import { RoomEngine } from "./domain/RoomEngine";
 import { drawCharacter } from "./characters";
 import React, { useEffect, useRef, useState } from "react";
-import type { Furniture, Agent, Task } from "../../shared/types";
+import type { Furniture, Agent, Task, Room } from "../../shared/types";
 import { LayoutEngine, catalog, type Cell } from "./domain/LayoutEngine";
 class SpriteAtlas {
   room = new Image();
@@ -15,6 +16,7 @@ class SpriteAtlas {
 const atlas = new SpriteAtlas();
 export function Office({
   items,
+  rooms = [],
   edit,
   tool,
   onChange,
@@ -24,6 +26,7 @@ export function Office({
   onOpen,
 }: {
   items: Furniture[];
+  rooms?: Room[];
   edit: boolean;
   tool: string;
   onChange: (v: Furniture[]) => void;
@@ -55,7 +58,7 @@ export function Office({
   const positions = useRef<
     Record<string, { x: number; y: number; path: Cell[]; target: string }>
   >({});
-  const engine = new LayoutEngine(items);
+  const engine = new LayoutEngine(items, rooms);
   function change(next: Furniture[]) {
     history.current.push(structuredClone(items));
     if (history.current.length > 60) history.current.shift();
@@ -156,6 +159,42 @@ export function Office({
             );
         c.drawImage(atlas.room, 0, 208, 352, 16, 0, 448, 704, 32);
       }
+      for (const [index, r] of rooms.entries()) {
+        const x = 32 + r.x * 32,
+          y = 64 + r.y * 32,
+          w = r.width * 32,
+          h = r.height * 32;
+        c.fillStyle = ["#8aab9c45", "#bda4ce45", "#d9b77945", "#8fb5c745"][
+          index % 4
+        ];
+        c.fillRect(x, y, w, h);
+        c.strokeStyle = "#635d55";
+        c.lineWidth = 5;
+        for (const side of ["north", "south", "west", "east"]) {
+          const horizontal = side === "north" || side === "south";
+          const length = horizontal ? r.width : r.height;
+          for (let k = 0; k < length; k++) {
+            if (side === r.door_side && k === r.door_offset) continue;
+            c.beginPath();
+            if (horizontal) {
+              const sy = side === "north" ? y : y + h;
+              c.moveTo(x + k * 32, sy);
+              c.lineTo(x + (k + 1) * 32, sy);
+            } else {
+              const sx = side === "west" ? x : x + w;
+              c.moveTo(sx, y + k * 32);
+              c.lineTo(sx, y + (k + 1) * 32);
+            }
+            c.stroke();
+          }
+        }
+        c.fillStyle = "#fbf7eee8";
+        c.fillRect(x + 5, y + 5, w - 10, 20);
+        c.fillStyle = "#302d28";
+        c.font = "bold 12px sans-serif";
+        c.fillText(r.name, x + 9, y + 19, w - 18);
+      }
+      c.lineWidth = 1;
       for (const item of [...items].sort((a, b) => a.y - b.y)) {
         const def = catalog[item.kind];
         if (!def) continue;
@@ -216,17 +255,22 @@ export function Office({
           );
           const working = task?.status === "running";
           const epoch = Math.floor(now / 8000);
+          const room = new RoomEngine(rooms).assigned(agent);
           const goal =
             working || reduced
-              ? engine.nearest(agent)
-              : engine.nearest({
-                  x: (index * 5 + epoch * 3) % 20,
-                  y: (index * 3 + epoch * 2) % 12,
-                });
+              ? engine.nearest(agent, room, !room)
+              : engine.nearest(
+                  {
+                    x: (index * 5 + epoch * 3) % 20,
+                    y: (index * 3 + epoch * 2) % 12,
+                  },
+                  room,
+                  !room,
+                );
           const target = `${goal.x},${goal.y}`;
           let p = positions.current[agent.id];
           if (!p) {
-            const start = engine.nearest(agent);
+            const start = engine.nearest(agent, room, !room);
             p = positions.current[agent.id] = {
               ...start,
               path: [],
@@ -302,7 +346,10 @@ export function Office({
     }
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [items, agents, tasks, edit, selected, cursor]);
+  }, [items, rooms, agents, tasks, edit, selected, cursor]);
+  useEffect(() => {
+    positions.current = {};
+  }, [JSON.stringify(rooms), JSON.stringify(items)]);
   function cell(e: React.PointerEvent): Cell {
     const r = canvas.current!.getBoundingClientRect();
     return {

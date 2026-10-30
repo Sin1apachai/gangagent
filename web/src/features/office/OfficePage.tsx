@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
+import { RoomPanel } from "./RoomPanel";
+import { RoomEngine } from "./domain/RoomEngine";
 import type {
   Furniture,
   Agent,
@@ -18,6 +20,7 @@ import { furniture, statusLabel } from "../../shared/constants";
 import { Office } from "../office/Office";
 import type { OfficeController } from "../../application/useOfficeController";
 export function OfficePage({ ctx }: { ctx: OfficeController }) {
+  const [editTab, setEditTab] = useState("furniture");
   const {
     user,
     setUser,
@@ -41,6 +44,8 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
     setEdit,
     items,
     setItems,
+    rooms,
+    setRooms,
     tool,
     setTool,
     query,
@@ -122,6 +127,7 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
                     disabled={busy}
                     onClick={() => {
                       setItems(data.layout.items);
+                      setRooms(data.layout.rooms ?? []);
                       setEdit(false);
                     }}
                   >
@@ -132,11 +138,13 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
                     disabled={busy}
                     onClick={() =>
                       run(async () => {
+                        const err = new RoomEngine(rooms).validate(items);
+                        if (err) throw new Error(err);
                         await api(
                           `/workspaces/${wid}/layout`,
                           {
                             version: data.layout_version,
-                            layout: { items },
+                            layout: { items, rooms },
                           },
                           "PUT",
                         );
@@ -144,11 +152,12 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
                         const d = await api<Snapshot>("/workspaces/" + wid);
                         setData(d);
                         setItems(d.layout.items);
-                        setMessage("บันทึกห้องแล้ว");
+                        setRooms(d.layout.rooms ?? []);
+                        setMessage("บันทึกออฟฟิศแล้ว");
                       })
                     }
                   >
-                    บันทึกห้อง
+                    บันทึกออฟฟิศ
                   </button>
                 </>
               ) : (
@@ -160,22 +169,58 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
               )}
             </div>
           </div>
+          {edit && (
+            <div
+              role="tablist"
+              aria-label="เครื่องมือจัดออฟฟิศ"
+              className="office-edit-tabs"
+            >
+              <button
+                role="tab"
+                aria-selected={editTab === "furniture"}
+                onClick={() => setEditTab("furniture")}
+              >
+                เฟอร์นิเจอร์
+              </button>
+              <button
+                role="tab"
+                aria-selected={editTab === "rooms"}
+                onClick={() => setEditTab("rooms")}
+              >
+                ห้องและฝ่าย
+              </button>
+            </div>
+          )}
+          {edit && editTab === "rooms" && (
+            <RoomPanel
+              key={wid}
+              rooms={rooms}
+              items={items}
+              agents={data.agents}
+              edit={true}
+              onChange={setRooms}
+            />
+          )}
           <div className="office-stage">
             <div className="scene-label">
               YOUR OFFICE · {edit ? "EDIT MODE" : "LIVE DATA"}
             </div>
             <Office
+              key={wid}
+              rooms={rooms}
               items={items}
-              edit={edit}
+              edit={edit && editTab === "furniture"}
               tool={tool}
               onChange={setItems}
               agents={data.agents}
               tasks={data.tasks}
               onAgent={(a) => {
+                if (edit) return;
                 setPage("team");
                 setQuery(a.name);
               }}
               onOpen={(kind) =>
+                !edit &&
                 setPage(
                   kind === "bookshelf"
                     ? "knowledge"
@@ -186,7 +231,7 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
               }
             />
           </div>
-          {edit && (
+          {edit && editTab === "furniture" && (
             <div className="catalog">
               <b>FURNITURE</b>
               {furniture.map(([k, n]) => (
@@ -199,6 +244,15 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
                 </button>
               ))}
             </div>
+          )}
+          {!edit && (
+            <RoomPanel
+              rooms={rooms}
+              items={items}
+              agents={data.agents}
+              edit={false}
+              onChange={setRooms}
+            />
           )}
           <div className="office-footer">
             <span>☀ Your space, your pace.</span>

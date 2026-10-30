@@ -188,16 +188,21 @@ mod tests {
             rotation: 0,
         };
         assert!(valid_layout(&Layout {
+            rooms: vec![],
             items: vec![i.clone()]
         }));
         let mut j = i.clone();
         j.id = "b".into();
         assert!(!valid_layout(&Layout {
+            rooms: vec![],
             items: vec![i.clone(), j]
         }));
         let mut j = i;
         j.x = 20;
-        assert!(!valid_layout(&Layout { items: vec![j] }));
+        assert!(!valid_layout(&Layout {
+            rooms: vec![],
+            items: vec![j]
+        }));
     }
 }
 
