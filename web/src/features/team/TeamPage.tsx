@@ -160,6 +160,16 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
                       >
                         แก้ไข
                       </button>
+                      {canManage && (
+                        <button
+                          onClick={() => {
+                            ctx.setOrgAgentId(a.id);
+                            setPage("organization");
+                          }}
+                        >
+                          ฝ่าย หน้าที่ และขอบเขต
+                        </button>
+                      )}
                       <button
                         onClick={() =>
                           setModal({

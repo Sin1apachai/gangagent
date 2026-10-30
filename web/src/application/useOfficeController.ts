@@ -24,6 +24,7 @@ export function useOfficeController() {
     [wid, setWid] = useState(""),
     [data, setData] = useState<Snapshot | null>(null),
     [page, setPage] = useState("office"),
+    [orgAgentId, setOrgAgentId] = useState<string | null>(null),
     [edit, setEdit] = useState(false),
     [items, setItems] = useState<Furniture[]>([]),
     [rooms, setRooms] = useState<Room[]>([]),
@@ -120,6 +121,7 @@ export function useOfficeController() {
     setData(null);
     setEdit(false);
     setQuery("");
+    setOrgAgentId(null);
     setDetail(null);
     if (wid)
       api<Snapshot>("/workspaces/" + wid)
@@ -221,6 +223,8 @@ export function useOfficeController() {
     setData,
     page,
     setPage,
+    orgAgentId,
+    setOrgAgentId,
     edit,
     setEdit,
     items,

@@ -83,6 +83,14 @@ export function OrganizationPage({ ctx }: { ctx: OfficeController }) {
   useEffect(() => {
     if (active && wid) load().catch((e) => ctx.setError(String(e)));
   }, [agentRevision]);
+  useEffect(() => {
+    if (!active || !ctx.orgAgentId) return;
+    const agent = org.agents.find((a) => a.id === ctx.orgAgentId);
+    if (agent) {
+      setSelected(agent);
+      ctx.setOrgAgentId(null);
+    }
+  }, [active, ctx.orgAgentId, org.agents]);
   if (!active || !wid) return null;
   const base = `/workspaces/${wid}`;
   const archive = async (kind: string, id: string, restore: boolean) => {
@@ -202,8 +210,9 @@ export function OrganizationPage({ ctx }: { ctx: OfficeController }) {
               <span className="eyebrow">WHO DOES WHAT</span>
               <h2>บทบาทชัดเจน ส่งต่องานได้ถูกคน</h2>
               <p>
-                เลือกสมาชิกเพื่อดูหน้าที่ หัวหน้าทีม และ Skill ·
-                เส้นในแผนผังแสดงสายรายงาน ส่วนลำดับงานกำหนดใน Workflow
+                คลิกการ์ด Agent เพื่อกรอกฝ่าย หน้าที่รับผิดชอบ ขอบเขตการตัดสินใจ
+                หัวหน้าทีม และ Skill · เส้นในแผนผังแสดงสายรายงาน
+                ส่วนลำดับงานกำหนดใน Workflow
               </p>
             </div>
             <button

@@ -44,6 +44,7 @@ export function OrgTree({
             {a.enabled ? "พร้อมทำงาน" : "พักการทำงาน"}
           </small>
           <em>✦ {bindings.filter((b) => b.agent_id === a.id).length} Skills</em>
+          <small>เปิดฝ่าย หน้าที่ และขอบเขต →</small>
           {a.manager_id && !ids.has(a.manager_id) && (
             <small className="error">หัวหน้าไม่อยู่ในทีมปัจจุบัน</small>
           )}

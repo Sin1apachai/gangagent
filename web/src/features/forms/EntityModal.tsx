@@ -394,6 +394,42 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                 )}
                 {modal.kind === "agent" && (
                   <>
+                    {modal.value?.id && canManage && (
+                      <div className="actions" style={{ marginBottom: 16 }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            const v = modal.value,
+                              f = new FormData(e.currentTarget.form!);
+                            const originalRoom =
+                              v.office_placement === "room"
+                                ? "room:" + v.office_room_id
+                                : (v.office_placement ?? "auto");
+                            const changed =
+                              ["name", "role", "instructions", "provider"].some(
+                                (k) =>
+                                  String(f.get(k) ?? "") !== String(v[k] ?? ""),
+                              ) ||
+                              (f.get("enabled") === "on") !== v.enabled ||
+                              birthDate !== (v.birth_date ?? "") ||
+                              character !== (v.character_id ?? 0) ||
+                              String(f.get("agent_room") ?? "auto") !==
+                                originalRoom;
+                            if (changed) {
+                              setError(
+                                "มีข้อมูล Agent ที่ยังไม่บันทึก กรุณาบันทึกก่อนเปิดฝ่าย หน้าที่ และขอบเขต",
+                              );
+                              return;
+                            }
+                            ctx.setOrgAgentId(v.id);
+                            setModal(null);
+                            setPage("organization");
+                          }}
+                        >
+                          ฝ่าย หน้าที่ และขอบเขต →
+                        </button>
+                      </div>
+                    )}
                     <FormTabs
                       label="ตั้งค่า Agent"
                       value={agentTab}
