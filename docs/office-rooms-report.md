@@ -1,5 +1,7 @@
 # Multi-room office verification
 
+The original numeric room form has been replaced by the [visual room builder](visual-room-builder-report.md).
+
 Verified on 2026-10-30 using Docker Compose and the real browser.
 
 ## Behavior

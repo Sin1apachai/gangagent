@@ -1,0 +1,10 @@
+{
+  "browser_drag_draw_verified": true,
+  "browser_wall_click_door_placement_verified": true,
+  "browser_room_move_resize_verified": true,
+  "browser_undo_redo_verified": true,
+  "save_disabled_until_new_room_has_door": true,
+  "saved_geometry_matches_browser_operations": true,
+  "layout_survives_restart": true,
+  "model_calls": 0
+}

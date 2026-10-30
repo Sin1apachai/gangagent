@@ -26,6 +26,7 @@ export function Office({
   onOpen,
   onRoomPick,
   onAgentMove,
+  roomOverlay,
 }: {
   items: Furniture[];
   rooms?: Room[];
@@ -38,6 +39,7 @@ export function Office({
   onOpen?: (kind: string) => void;
   onRoomPick?: (room: Room | undefined) => void;
   onAgentMove?: (agent: Agent, room: Room | undefined) => void;
+  roomOverlay?: React.ReactNode;
 }) {
   const agentDrag = useRef<{ agent: Agent; start: Cell } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
@@ -198,6 +200,48 @@ export function Office({
         c.fillStyle = "#302d28";
         c.font = "bold 12px sans-serif";
         c.fillText(r.name, x + 9, y + 19, w - 18);
+        // Door frame and open leaf make the entrance visible, not just a gap.
+        const horizontal = r.door_side === "north" || r.door_side === "south";
+        const hingeX =
+          x +
+          (r.door_side === "east" ? w : horizontal ? r.door_offset * 32 : 0);
+        const hingeY =
+          y +
+          (r.door_side === "south" ? h : horizontal ? 0 : r.door_offset * 32);
+        const tangent = { x: horizontal ? 1 : 0, y: horizontal ? 0 : 1 };
+        const inward = {
+          x: r.door_side === "west" ? 1 : r.door_side === "east" ? -1 : 0,
+          y: r.door_side === "north" ? 1 : r.door_side === "south" ? -1 : 0,
+        };
+        c.save();
+        c.strokeStyle = "#9b7b43";
+        c.lineWidth = 2;
+        c.setLineDash([3, 3]);
+        c.beginPath();
+        c.moveTo(hingeX + tangent.x * 27, hingeY + tangent.y * 27);
+        c.quadraticCurveTo(
+          hingeX + (tangent.x + inward.x) * 27,
+          hingeY + (tangent.y + inward.y) * 27,
+          hingeX + inward.x * 27,
+          hingeY + inward.y * 27,
+        );
+        c.stroke();
+        c.setLineDash([]);
+        c.strokeStyle = "#78512c";
+        c.lineWidth = 5;
+        c.beginPath();
+        c.moveTo(hingeX, hingeY);
+        c.lineTo(hingeX + inward.x * 27, hingeY + inward.y * 27);
+        c.stroke();
+        c.fillStyle = "#e4bc61";
+        c.fillRect(hingeX - 3, hingeY - 3, 6, 6);
+        c.fillRect(
+          hingeX + tangent.x * 32 - 3,
+          hingeY + tangent.y * 32 - 3,
+          6,
+          6,
+        );
+        c.restore();
       }
       c.lineWidth = 1;
       for (const item of [...items].sort((a, b) => a.y - b.y)) {
@@ -370,101 +414,112 @@ export function Office({
   return (
     <div className="room-engine">
       <div className="room-viewport" ref={viewport}>
-        <canvas
-          ref={canvas}
-          width={704}
-          height={480}
-          style={{
-            width: 704 * zoom * fit,
-            maxWidth: "none",
-            touchAction: edit ? "none" : "pan-x pan-y",
-          }}
-          tabIndex={0}
-          aria-label="แผนที่สำนักงาน ตาราง 20 คูณ 12 ช่อง"
-          onKeyDown={(e) => {
-            if (!edit) return;
-            const steps: Record<string, Cell> = {
-              ArrowLeft: { x: -1, y: 0 },
-              ArrowRight: { x: 1, y: 0 },
-              ArrowUp: { x: 0, y: -1 },
-              ArrowDown: { x: 0, y: 1 },
-            };
-            if (steps[e.key]) {
-              e.preventDefault();
-              setCursor((c) => ({
-                x: Math.max(0, Math.min(19, c.x + steps[e.key].x)),
-                y: Math.max(0, Math.min(11, c.y + steps[e.key].y)),
-              }));
-            }
-            if (e.key === "Enter") {
-              e.preventDefault();
-              place(cursor, selected ?? undefined);
-            }
-            if (e.key.toLowerCase() === "r") rotate();
-            if (e.key === "Escape") setSelected(null);
-            if (e.key === "Delete" && selected)
-              change(items.filter((i) => i.id !== selected));
-            if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-              e.preventDefault();
-              e.shiftKey ? redo() : undo();
-            }
-          }}
-          onPointerDown={(e) => {
-            const p = cell(e),
-              i = engine.hit(p.x, p.y);
-            setCursor(p);
-            if (onRoomPick) {
-              if (p.x >= 0 && p.x < 20 && p.y >= 0 && p.y < 12)
-                onRoomPick(rooms.find((r) => RoomEngine.contains(r, p.x, p.y)));
-              return;
-            }
-            if (edit) {
-              if (i) {
-                setSelected(i.id);
-                drag.current = i.id;
-                canvas.current?.setPointerCapture(e.pointerId);
-              } else place(p);
-            } else {
-              const a = agents.find((a) => {
-                const at = positions.current[a.id];
-                return (
-                  at && Math.abs(at.x - p.x) < 1 && Math.abs(at.y - p.y) < 1
-                );
-              });
-              if (a && onAgentMove) {
-                agentDrag.current = { agent: a, start: p };
-                canvas.current?.setPointerCapture(e.pointerId);
-              } else if (a) onAgent?.(a);
-              else if (i) onOpen?.(i.kind);
-            }
-          }}
-          onPointerCancel={() => {
-            agentDrag.current = null;
-            drag.current = null;
-          }}
-          onPointerUp={(e) => {
-            if (agentDrag.current) {
-              const { agent, start } = agentDrag.current;
-              agentDrag.current = null;
-              const end = cell(e);
-              if (Math.abs(start.x - end.x) + Math.abs(start.y - end.y) >= 1) {
-                if (end.x >= 0 && end.x < 20 && end.y >= 0 && end.y < 12)
-                  onAgentMove?.(
-                    agent,
-                    rooms.find((r) => RoomEngine.contains(r, end.x, end.y)),
-                  );
-              } else onAgent?.(agent);
-              return;
-            }
-            if (drag.current) {
+        <div style={{ position: "relative", width: 704 * zoom * fit }}>
+          <canvas
+            ref={canvas}
+            width={704}
+            height={480}
+            style={{
+              display: "block",
+              width: 704 * zoom * fit,
+              maxWidth: "none",
+              touchAction: edit ? "none" : "pan-x pan-y",
+            }}
+            tabIndex={0}
+            aria-label="แผนที่สำนักงาน ตาราง 20 คูณ 12 ช่อง"
+            onKeyDown={(e) => {
+              if (!edit) return;
+              const steps: Record<string, Cell> = {
+                ArrowLeft: { x: -1, y: 0 },
+                ArrowRight: { x: 1, y: 0 },
+                ArrowUp: { x: 0, y: -1 },
+                ArrowDown: { x: 0, y: 1 },
+              };
+              if (steps[e.key]) {
+                e.preventDefault();
+                setCursor((c) => ({
+                  x: Math.max(0, Math.min(19, c.x + steps[e.key].x)),
+                  y: Math.max(0, Math.min(11, c.y + steps[e.key].y)),
+                }));
+              }
+              if (e.key === "Enter") {
+                e.preventDefault();
+                place(cursor, selected ?? undefined);
+              }
+              if (e.key.toLowerCase() === "r") rotate();
+              if (e.key === "Escape") setSelected(null);
+              if (e.key === "Delete" && selected)
+                change(items.filter((i) => i.id !== selected));
+              if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+                e.preventDefault();
+                e.shiftKey ? redo() : undo();
+              }
+            }}
+            onPointerDown={(e) => {
               const p = cell(e),
-                old = items.find((i) => i.id === drag.current);
-              if (old && (old.x !== p.x || old.y !== p.y))
-                place(p, drag.current);
+                i = engine.hit(p.x, p.y);
+              setCursor(p);
+              if (onRoomPick) {
+                if (p.x >= 0 && p.x < 20 && p.y >= 0 && p.y < 12)
+                  onRoomPick(
+                    rooms.find((r) => RoomEngine.contains(r, p.x, p.y)),
+                  );
+                return;
+              }
+              if (edit) {
+                if (i) {
+                  setSelected(i.id);
+                  drag.current = i.id;
+                  canvas.current?.setPointerCapture(e.pointerId);
+                } else place(p);
+              } else {
+                const a = agents.find((a) => {
+                  const at = positions.current[a.id];
+                  return (
+                    at && Math.abs(at.x - p.x) < 1 && Math.abs(at.y - p.y) < 1
+                  );
+                });
+                if (a && onAgentMove) {
+                  agentDrag.current = { agent: a, start: p };
+                  canvas.current?.setPointerCapture(e.pointerId);
+                } else if (a) onAgent?.(a);
+                else if (i) onOpen?.(i.kind);
+              }
+            }}
+            onPointerCancel={() => {
+              agentDrag.current = null;
               drag.current = null;
-            }
-          }}
-        />
+            }}
+            onPointerUp={(e) => {
+              if (agentDrag.current) {
+                const { agent, start } = agentDrag.current;
+                agentDrag.current = null;
+                const end = cell(e);
+                if (
+                  Math.abs(start.x - end.x) + Math.abs(start.y - end.y) >=
+                  1
+                ) {
+                  if (end.x >= 0 && end.x < 20 && end.y >= 0 && end.y < 12)
+                    onAgentMove?.(
+                      agent,
+                      rooms.find((r) => RoomEngine.contains(r, end.x, end.y)),
+                    );
+                } else onAgent?.(agent);
+                return;
+              }
+              if (drag.current) {
+                const p = cell(e),
+                  old = items.find((i) => i.id === drag.current);
+                if (old && (old.x !== p.x || old.y !== p.y))
+                  place(p, drag.current);
+                drag.current = null;
+              }
+            }}
+          />
+          {roomOverlay && (
+            <div style={{ position: "absolute", inset: 0 }}>{roomOverlay}</div>
+          )}
+        </div>
       </div>
       <div className="canvas-tools">
         <button

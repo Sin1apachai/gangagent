@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { RoomBuilder } from "./RoomBuilder";
 import { RoomPanel } from "./RoomPanel";
 import { RoomEngine } from "./domain/RoomEngine";
 import type {
@@ -21,6 +22,7 @@ import { Office } from "../office/Office";
 import type { OfficeController } from "../../application/useOfficeController";
 export function OfficePage({ ctx }: { ctx: OfficeController }) {
   const [editTab, setEditTab] = useState("furniture");
+  const [roomPending, setRoomPending] = useState(false);
   const {
     user,
     setUser,
@@ -83,6 +85,9 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
     start,
     showTask,
   } = ctx;
+  useEffect(() => {
+    if (!edit) setRoomPending(false);
+  }, [edit, wid]);
   if (!user) return null;
   return (
     <>
@@ -135,7 +140,7 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
                   </button>
                   <button
                     className="primary"
-                    disabled={busy}
+                    disabled={busy || roomPending}
                     onClick={() =>
                       run(async () => {
                         const err = new RoomEngine(rooms).validate(items);
@@ -192,66 +197,68 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
             </div>
           )}
           {edit && editTab === "rooms" && (
-            <RoomPanel
+            <RoomBuilder
               key={wid}
               rooms={rooms}
               items={items}
               agents={data.agents}
-              edit={true}
               onChange={setRooms}
+              onPendingChange={setRoomPending}
             />
           )}
-          <div className="office-stage">
-            <div className="scene-label">
-              YOUR OFFICE · {edit ? "EDIT MODE" : "LIVE DATA"}
+          {!(edit && editTab === "rooms") && (
+            <div className="office-stage">
+              <div className="scene-label">
+                YOUR OFFICE · {edit ? "EDIT MODE" : "LIVE DATA"}
+              </div>
+              <Office
+                key={wid}
+                rooms={rooms}
+                items={items}
+                edit={edit && editTab === "furniture"}
+                tool={tool}
+                onChange={setItems}
+                agents={data.agents}
+                tasks={data.tasks}
+                onAgentMove={
+                  canWrite && !edit && !busy
+                    ? (agent, room) => {
+                        run(async () => {
+                          await api(
+                            `/workspaces/${wid}/agents/${agent.id}`,
+                            {
+                              ...agent,
+                              office_placement: room ? "room" : "common",
+                              office_room_id: room?.id ?? null,
+                            },
+                            "PUT",
+                          );
+                          await refresh();
+                          setMessage(
+                            `ย้าย ${agent.name} ไป${room?.name ?? "พื้นที่ส่วนกลาง"}แล้ว`,
+                          );
+                        });
+                      }
+                    : undefined
+                }
+                onAgent={(a) => {
+                  if (edit) return;
+                  setPage("team");
+                  setQuery(a.name);
+                }}
+                onOpen={(kind) =>
+                  !edit &&
+                  setPage(
+                    kind === "bookshelf"
+                      ? "knowledge"
+                      : kind === "board"
+                        ? "tasks"
+                        : "team",
+                  )
+                }
+              />
             </div>
-            <Office
-              key={wid}
-              rooms={rooms}
-              items={items}
-              edit={edit && editTab === "furniture"}
-              tool={tool}
-              onChange={setItems}
-              agents={data.agents}
-              tasks={data.tasks}
-              onAgentMove={
-                canWrite && !edit && !busy
-                  ? (agent, room) => {
-                      run(async () => {
-                        await api(
-                          `/workspaces/${wid}/agents/${agent.id}`,
-                          {
-                            ...agent,
-                            office_placement: room ? "room" : "common",
-                            office_room_id: room?.id ?? null,
-                          },
-                          "PUT",
-                        );
-                        await refresh();
-                        setMessage(
-                          `ย้าย ${agent.name} ไป${room?.name ?? "พื้นที่ส่วนกลาง"}แล้ว`,
-                        );
-                      });
-                    }
-                  : undefined
-              }
-              onAgent={(a) => {
-                if (edit) return;
-                setPage("team");
-                setQuery(a.name);
-              }}
-              onOpen={(kind) =>
-                !edit &&
-                setPage(
-                  kind === "bookshelf"
-                    ? "knowledge"
-                    : kind === "board"
-                      ? "tasks"
-                      : "team",
-                )
-              }
-            />
-          </div>
+          )}
           {edit && editTab === "furniture" && (
             <div className="catalog">
               <b>FURNITURE</b>
