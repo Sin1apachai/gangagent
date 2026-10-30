@@ -1,0 +1,19 @@
+.backup-panel .backup-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid currentColor;
+  text-decoration: none;
+  font-weight: 600;
+}
+.backup-panel .actions {
+  flex-wrap: wrap;
+}
+.backup-panel article h3 {
+  margin-bottom: 0;
+}
+.backup-panel code {
+  word-break: break-all;
+}

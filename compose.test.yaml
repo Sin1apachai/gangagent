@@ -7,6 +7,11 @@ services:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
       EMBEDDING_ADDR: ""
     restart: "no"
+  backup:
+    environment:
+      PGDATABASE: office_test
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
+    restart: "no"
   postgres:
     environment:
       POSTGRES_DB: office_test
@@ -30,6 +35,7 @@ services:
     restart: "no"
   tests:
     depends_on:
+      backup: {condition: service_started}
       worker: {condition: service_started}
       worker-two: {condition: service_started}
   worker-two:

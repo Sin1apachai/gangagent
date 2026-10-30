@@ -1,6 +1,7 @@
 mod admin;
 mod application;
 mod auth;
+mod backup;
 mod collaboration;
 mod context_engine;
 mod domain;
@@ -16,8 +17,8 @@ use auth::*;
 use workspaces::*;
 mod phase2;
 mod provider_login;
-mod worker;
 mod usage;
+mod worker;
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
@@ -78,6 +79,11 @@ struct User {
     is_super_admin: bool,
 }
 pub async fn run() {
+    if std::env::args().any(|a| a == "--backup-worker") {
+        tokio::select! {r=backup::run_worker()=>{if r.is_err(){eprintln!("Backup service stopped; check database, artifact storage and disk capacity");std::process::exit(1);}},_=shutdown()=>{}}
+        return;
+    }
+
     if std::env::args().any(|a| a == "--worker") {
         tokio::select! {
             r=worker::run_worker()=>{if let Err(e)=r {eprintln!("Worker stopped: {e}");std::process::exit(1);}},
@@ -145,7 +151,8 @@ pub async fn run() {
                 .merge(master_data::routes())
                 .merge(recruitment::routes())
                 .merge(quota::routes())
-        .merge(context_engine::routes())
+                .merge(context_engine::routes())
+                .merge(backup::routes())
                 .merge(personal_workers::routes()),
         )
         .fallback(|| async { Error(StatusCode::NOT_FOUND, "API route not found") })

@@ -24,11 +24,14 @@ until docker compose -p "$RESTORE_PROJECT" exec -T postgres pg_isready -U office
   tries=$((tries+1)); [ "$tries" -lt 60 ] || { echo "Destination database not ready"; exit 1; }; sleep 1
 done
 # Pause destination services before restoring.
-docker compose -p "$RESTORE_PROJECT" stop app worker >/dev/null
+docker compose -p "$RESTORE_PROJECT" stop app worker backup >/dev/null
 docker compose -p "$RESTORE_PROJECT" exec -T postgres pg_restore -U office -d "$database" --single-transaction --clean --if-exists --no-owner --no-privileges < "$src/office.dump"
+if [ -f "$src/post-restore.sql" ]; then
+  docker compose -p "$RESTORE_PROJECT" exec -T postgres psql -U office -d "$database" -v ON_ERROR_STOP=1 < "$src/post-restore.sql" >/dev/null
+fi
 # Old generated roles do not migrate: revoke bindings and reconnect each worker.
 docker compose -p "$RESTORE_PROJECT" exec -T postgres psql -U office -d "$database" -q -c "UPDATE worker_bindings SET revoked_at=coalesce(revoked_at,now()); UPDATE office_maintenance SET paused=false WHERE id; UPDATE tasks SET status='interrupted',execution_requested=false,lease_until=NULL,error='Restored backup; review before retrying' WHERE status='running'" >/dev/null
 # Use the coordinator image, never give the web app a writable data volume.
 docker compose -p "$RESTORE_PROJECT" run --rm -T --no-deps --entrypoint tar worker --acls -C /data -xzf - < "$src/artifacts.tar.gz"
-docker compose -p "$RESTORE_PROJECT" up -d app worker
+docker compose -p "$RESTORE_PROJECT" up -d app worker backup
 printf '%s\n' "Restored into $RESTORE_PROJECT. Check data and reconnect subscription accounts before starting tasks."

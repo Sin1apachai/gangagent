@@ -29,3 +29,9 @@ ENV HOME=/home/office CODEX_HOME=/home/office/.codex CLAUDE_CONFIG_DIR=/home/off
 WORKDIR /app
 COPY --from=rust-build /build/agent-office-bin /app/agent-office
 CMD ["/app/agent-office", "--worker"]
+
+FROM postgres:17-bookworm AS backup
+WORKDIR /app
+COPY --from=rust-build /build/agent-office-bin /app/agent-office
+ENTRYPOINT ["/app/agent-office"]
+CMD ["--backup-worker"]
