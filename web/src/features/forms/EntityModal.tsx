@@ -91,6 +91,10 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
         .then(setProjects)
         .catch(() => {});
   }, [wid, modal?.kind]);
+  const [taskProject, setTaskProject] = useState("");
+  useEffect(() => {
+    setTaskProject(modal?.value?.project_id ?? "");
+  }, [modal?.kind, modal?.value?.id, modal?.value?.project_id]);
   const [agentTab, setAgentTab] = useState("profile"),
     [character, setCharacter] = useState(0),
     [birthDate, setBirthDate] = useState("");
@@ -279,7 +283,8 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                       โปรเจกต์
                       <select
                         name="project_id"
-                        defaultValue={modal.value?.project_id ?? ""}
+                        value={taskProject}
+                        onChange={(e) => setTaskProject(e.target.value)}
                       >
                         <option value="">ไม่ระบุ</option>
                         {projects

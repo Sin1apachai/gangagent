@@ -1,0 +1,9 @@
+{
+  "browser_create_project_read_only_card_verified": true,
+  "browser_task_project_preselected_verified": true,
+  "task_created_in_correct_project": true,
+  "browser_edit_cancel_and_save_verified": true,
+  "browser_trash_confirmation_and_restore_verified": true,
+  "existing_tasks_preserved_after_restore": true,
+  "model_calls": 0
+}

@@ -1,0 +1,159 @@
+.projects-feature {
+  margin: 8px 0 24px;
+}
+.projects-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.projects-heading h2 {
+  margin: 0 0 10px;
+}
+.projects-heading p {
+  margin: 0;
+  line-height: 1.8;
+  color: #706555;
+  max-width: 650px;
+}
+.project-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 20px;
+  margin-top: 22px;
+}
+.project-card {
+  padding: 24px;
+  background: #fbf7ee;
+  border: 1px solid #bfb5a3;
+  box-shadow: 3px 3px 0 #cabfa9;
+  min-width: 0;
+}
+.project-card.newly-created {
+  border: 2px solid #456b58;
+}
+.project-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+.project-card h3 {
+  margin: 9px 0 0;
+  overflow-wrap: anywhere;
+}
+.project-description {
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #62584b;
+  margin: 18px 0;
+}
+.project-task-count {
+  font-size: 13px;
+  color: #6c6255;
+  border-top: 1px solid #ddd1bd;
+  padding-top: 15px;
+}
+.project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+.project-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+.project-menu summary {
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px;
+  color: #65594a;
+}
+.project-menu button {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 160px;
+  z-index: 5;
+  background: #fffaf1;
+  color: #963f35;
+}
+.projects-notice {
+  background: #e6eee2;
+  border: 1px solid #94a98f;
+  padding: 16px 20px;
+  margin: 18px 0;
+  line-height: 1.8;
+}
+.project-next-step {
+  color: #365c44;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.projects-empty {
+  border: 1px dashed #bdaf96;
+  background: #fbf7ee;
+  padding: 34px;
+  text-align: center;
+  margin-top: 22px;
+}
+.projects-empty p {
+  line-height: 1.8;
+  color: #6c6255;
+}
+.project-form-fields {
+  display: grid;
+  gap: 22px;
+  margin: 25px 0;
+}
+.project-form-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.project-form-fields input,
+.project-form-fields textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  min-height: 44px;
+}
+.project-form-fields textarea {
+  resize: vertical;
+}
+.project-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid #d8cbb6;
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.project-editor .form-section-help {
+  line-height: 1.8;
+}
+.project-editor {
+  max-width: 600px;
+}
+@media (max-width: 700px) {
+  .projects-heading {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .project-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .project-card {
+    padding: 20px;
+  }
+  .project-actions button {
+    flex: 1;
+  }
+  .project-editor-actions button {
+    flex: 1;
+  }
+}

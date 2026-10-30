@@ -1,3 +1,4 @@
+import { ProjectsPanel, type Project } from "./ProjectsPanel";
 import { PlanUsage } from "./PlanUsage";
 import { StepEditor } from "../organization/StepEditor";
 import type { Skill, Organization, Reviewer } from "../organization/types";
@@ -5,13 +6,6 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import type { OfficeController } from "../../application/useOfficeController";
 import { statusLabel } from "../../shared/constants";
-type Project = {
-  id: string;
-  name: string;
-  description: string;
-  version: number;
-  deleted_at: string | null;
-};
 import type { Step } from "../organization/types";
 type Plan = {
   id: string;
@@ -77,96 +71,12 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
   return (
     <>
       {page === "projects" && (
-        <section className="panel">
-          <h2>โปรเจกต์ใน {data.name}</h2>
-          {canWrite && (
-            <form
-              className="inline-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget,
-                  f = Object.fromEntries(new FormData(form));
-                run(async () => {
-                  await api(`/workspaces/${wid}/projects`, f);
-                  form.reset();
-                  await load();
-                });
-              }}
-            >
-              <label>
-                ชื่อโปรเจกต์
-                <input name="name" required maxLength={100} />
-              </label>
-              <label>
-                รายละเอียด
-                <textarea name="description" maxLength={5000} />
-              </label>
-              <button disabled={busy} className="primary">
-                สร้างโปรเจกต์
-              </button>
-            </form>
-          )}
-          {projects.map((p) => (
-            <form
-              key={p.id}
-              className="provider-box"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = Object.fromEntries(new FormData(e.currentTarget));
-                run(async () => {
-                  await api(
-                    `/workspaces/${wid}/projects/${p.id}`,
-                    { ...f, version: p.version },
-                    "PUT",
-                  );
-                  await load();
-                });
-              }}
-            >
-              <label>
-                ชื่อ
-                <input
-                  name="name"
-                  defaultValue={p.name}
-                  key={p.name}
-                  required
-                  disabled={!canWrite || !!p.deleted_at}
-                />
-              </label>
-              <label>
-                รายละเอียด
-                <textarea
-                  name="description"
-                  defaultValue={p.description}
-                  key={p.description}
-                  disabled={!canWrite || !!p.deleted_at}
-                />
-              </label>
-              {canWrite && (
-                <div className="actions">
-                  {!p.deleted_at && <button disabled={busy}>บันทึก</button>}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      run(async () => {
-                        await api(
-                          `/workspaces/${wid}/projects/${p.id}${p.deleted_at ? "/restore" : ""}`,
-                          p.deleted_at ? {} : undefined,
-                          p.deleted_at ? "POST" : "DELETE",
-                        );
-                        await load();
-                      })
-                    }
-                  >
-                    {p.deleted_at ? "กู้คืน" : "ย้ายไปถังขยะ"}
-                  </button>
-                </div>
-              )}
-            </form>
-          ))}
-          {!projects.length && <p className="muted">ยังไม่มีโปรเจกต์</p>}
-        </section>
+        <ProjectsPanel
+          key={wid}
+          ctx={ctx}
+          projects={projects}
+          onRefresh={load}
+        />
       )}
       {page === "plans" && (
         <>
@@ -235,7 +145,22 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         : "ยกเลิกแล้ว"}
                   </span>
                 </div>
-                {p.status !== "draft" && <p className="muted">ข้อมูลประกอบ: {Array.from(new Set((data?.tasks||[]).filter(t=>t.plan_id===p.id).map(t=>t.context_format||"compact"))).map(m=>m==="focused"?"เลือกตามงาน (ทดลอง)":"เต็มตามเดิม").join(" / ") || "ยังไม่มีงาน"}</p>}
+                {p.status !== "draft" && (
+                  <p className="muted">
+                    ข้อมูลประกอบ:{" "}
+                    {Array.from(
+                      new Set(
+                        (data?.tasks || [])
+                          .filter((t) => t.plan_id === p.id)
+                          .map((t) => t.context_format || "compact"),
+                      ),
+                    )
+                      .map((m) =>
+                        m === "focused" ? "เลือกตามงาน (ทดลอง)" : "เต็มตามเดิม",
+                      )
+                      .join(" / ") || "ยังไม่มีงาน"}
+                  </p>
+                )}
                 <PlanUsage wid={wid} id={p.id} />
                 {p.planner_task_id && (
                   <div className="actions">
