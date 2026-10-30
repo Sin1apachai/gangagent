@@ -122,7 +122,7 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 { id: "usage", label: "การใช้ Token" },
               ]}
             />
-            <div hidden={taskTab !== "usage"} role="tabpanel" aria-label="การใช้ Token"><TaskUsage detail={detail} /></div>
+            <div hidden={taskTab !== "usage"} role="tabpanel" aria-label="การใช้ Token"><TaskUsage detail={detail} ctx={ctx} /></div>
             <div
               role="tabpanel"
               aria-label="โจทย์และ Skill"

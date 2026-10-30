@@ -20,7 +20,7 @@ fn normal_priority() -> String {
 pub(crate) async fn check_task(a: &App, wid: Uuid, b: &TaskForm) -> Result<()> {
     if b.context_format
         .as_ref()
-        .is_some_and(|v| !matches!(v.as_str(), "compact" | "pretty"))
+        .is_some_and(|v| !matches!(v.as_str(), "compact" | "pretty" | "focused"))
     {
         return Err(bad("Invalid context format"));
     }

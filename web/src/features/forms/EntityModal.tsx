@@ -294,6 +294,24 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                         <option value="urgent">ด่วน</option>
                       </select>
                     </label>
+                    {!modal.value?.id && (
+                      <label>
+                        ข้อมูลประกอบงาน
+                        <select name="context_format" defaultValue="compact">
+                          <option value="compact">เต็มตามเดิม</option>
+                          <option value="focused">
+                            เลือก Knowledge ตามงาน (ทดลอง)
+                          </option>
+                        </select>
+                        <small>
+                          โหมดทดลองเก็บบทบาทและ Skill ครบ
+                          เลือกเอกสารที่เกี่ยวข้อง
+                          หากข้อมูลไม่พอให้ใช้งานใหม่แบบเต็ม
+                          ระบุเอกสารบังคับด้วย [[knowledge:รหัสเอกสาร]]
+                          ในรายละเอียดได้
+                        </small>
+                      </label>
+                    )}
                     <Area
                       label="เกณฑ์ตรวจรับ"
                       name="acceptance_criteria"

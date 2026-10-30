@@ -235,6 +235,8 @@ async fn import_plan(
 struct Approval {
     version: i32,
     billing_acknowledged: bool,
+    #[serde(default)]
+    context_format: Option<String>,
 }
 async fn approve_plan(
     State(a): State<App>,
@@ -243,6 +245,12 @@ async fn approve_plan(
     Json(b): Json<Approval>,
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
+    if b.context_format
+        .as_ref()
+        .is_some_and(|s| !matches!(s.as_str(), "compact" | "pretty" | "focused"))
+    {
+        return Err(bad("Invalid context format"));
+    }
     access(&a, &u, wid, true).await?;
     if !b.billing_acknowledged {
         return Err(bad("Confirm subscription usage"));
@@ -285,7 +293,7 @@ async fn approve_plan(
             Some(contract.clone()),
         )
         .await?;
-        sqlx::query("INSERT INTO tasks(id,workspace_id,created_by,title,description,provider,agent_id,plan_id,execution_requested,execution_context,reviewer_id,workflow_step,acceptance_criteria) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12)").bind(tid).bind(wid).bind(u.id).bind(&step.title).bind(&step.description).bind(provider).bind(step.agent_id).bind(id).bind(context).bind(reviewer).bind(contract).bind(&step.acceptance_criteria).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO tasks(id,workspace_id,created_by,title,description,provider,agent_id,plan_id,execution_requested,execution_context,reviewer_id,workflow_step,acceptance_criteria,context_format) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13)").bind(tid).bind(wid).bind(u.id).bind(&step.title).bind(&step.description).bind(provider).bind(step.agent_id).bind(id).bind(context).bind(reviewer).bind(contract).bind(&step.acceptance_criteria).bind(b.context_format.as_deref().unwrap_or("compact")).execute(&mut *tx).await?;
         for &parent in &step.depends_on {
             sqlx::query("INSERT INTO task_dependencies VALUES($1,$2)")
                 .bind(tid)

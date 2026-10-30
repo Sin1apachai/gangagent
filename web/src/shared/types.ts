@@ -35,6 +35,7 @@ export type Agent = {
   version: number;
 };
 export type Task = {
+  context_format?: "compact" | "pretty" | "focused";
   quota_auto_resume?: boolean;
   quota_reset_at?: string | null;
   next_quota_check_at?: string | null;

@@ -311,3 +311,30 @@ of a general percentage saving. Compare input/output, cache and quality separate
 repeat with representative multi-step work before broad conclusions.
 
 Measured live results and limitations: [Context usage pilot](docs/context-usage-report.md).
+
+### Focused Knowledge and accepted handoffs (opt-in)
+
+New task → **ข้อมูลประกอบงาน → เลือก Knowledge ตามงาน (ทดลอง)**, or enable the
+focused option when approving a draft team plan. The default stays full bounded
+context. Focused mode chooses whole verified records by lexical relevance and
+preserves every role/Skill/safety instruction and acceptance contract. Critical
+records can be pinned with `[[knowledge:UUID]]` (copy from the Knowledge card).
+Missing/unauthorized or oversized required references fail before calling a model.
+
+Producing tasks can write `handoff.json` with `summary`, `decisions` array,
+`open_questions` array and `artifacts` paths. Accepted dependency briefs are used
+only after validating source run and registered artifact references; invalid
+briefs fall back to the normal result. Review summaries for missing facts.
+
+Task → **การใช้ Token** shows retrieval sources and counters. Team plan →
+**การใช้ Token ทั้งแผน** aggregates every recorded attempt/revision/planner run
+with provider-specific cache semantics and missing-data coverage. To use full
+context after insufficient evidence, send the task back, switch mode on its Token
+tab while it is not scheduled, and explicitly start again.
+
+[Live workflow results and limitations](docs/focused-context-report.md): this
+controlled noisy-library pilot observed **66.86% less reported input**, with six
+exact artifact checks passing, but **28.53% longer summed provider time**. This is
+one paired workflow, not a general saving guarantee or Pro quota measurement.
+No paid embeddings/API service was added. Lexical retrieval has limited synonym
+and Thai segmentation support; pin essential sources and retain human review.

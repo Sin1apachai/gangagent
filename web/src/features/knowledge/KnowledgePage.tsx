@@ -116,6 +116,17 @@ export function KnowledgePage({ ctx }: { ctx: OfficeController }) {
                   <h3>{k.title}</h3>
                   <p>{k.content}</p>
                   <small>แหล่งที่มา: {k.source || "ผู้ใช้บันทึก"}</small>
+                  {k.verified && (
+                    <details>
+                      <summary>อ้างอิงเป็นเอกสารบังคับในงาน</summary>
+                      <code
+                        style={{ overflowWrap: "anywhere" }}
+                      >{`[[knowledge:${k.id}]]`}</code>
+                      <p>
+                        คัดลอกข้อความนี้ลงรายละเอียดงานเพื่อเลือกเอกสารนี้ในโหมดทดลอง
+                      </p>
+                    </details>
+                  )}
                   {canWrite && (
                     <div className="actions">
                       <button

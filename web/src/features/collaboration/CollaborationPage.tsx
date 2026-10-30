@@ -1,3 +1,4 @@
+import { PlanUsage } from "./PlanUsage";
 import { StepEditor } from "../organization/StepEditor";
 import type { Skill, Organization, Reviewer } from "../organization/types";
 import React, { useEffect, useState } from "react";
@@ -27,7 +28,8 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
   const [projects, setProjects] = useState<Project[]>([]),
     [plans, setPlans] = useState<Plan[]>([]),
     [drafts, setDrafts] = useState<Record<string, Step[]>>({}),
-    [approved, setApproved] = useState<Record<string, boolean>>({});
+    [approved, setApproved] = useState<Record<string, boolean>>({}),
+    [focused, setFocused] = useState<Record<string, boolean>>({});
   const [skills, setSkills] = useState<Skill[]>([]),
     [organization, setOrganization] = useState<Organization>({
       agents: [],
@@ -233,6 +235,8 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         : "ยกเลิกแล้ว"}
                   </span>
                 </div>
+                {p.status !== "draft" && <p className="muted">ข้อมูลประกอบ: {Array.from(new Set((data?.tasks||[]).filter(t=>t.plan_id===p.id).map(t=>t.context_format||"compact"))).map(m=>m==="focused"?"เลือกตามงาน (ทดลอง)":"เต็มตามเดิม").join(" / ") || "ยังไม่มีงาน"}</p>}
+                <PlanUsage wid={wid} id={p.id} />
                 {p.planner_task_id && (
                   <div className="actions">
                     <button
@@ -343,6 +347,20 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                     <label className="check">
                       <input
                         type="checkbox"
+                        checked={!!focused[p.id]}
+                        onChange={(e) =>
+                          setFocused((v) => ({
+                            ...v,
+                            [p.id]: e.target.checked,
+                          }))
+                        }
+                      />
+                      ทดลองเลือก Knowledge ตามงานและใช้ใบส่งต่อที่ผ่านตรวจ ·
+                      เก็บ Skill ครบทุกขั้น
+                    </label>
+                    <label className="check">
+                      <input
+                        type="checkbox"
                         checked={!!approved[p.id]}
                         onChange={(e) =>
                           setApproved((v) => ({
@@ -365,7 +383,13 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         run(async () => {
                           await api(
                             `/workspaces/${wid}/plans/${p.id}/approve`,
-                            { version: p.version, billing_acknowledged: true },
+                            {
+                              version: p.version,
+                              billing_acknowledged: true,
+                              context_format: focused[p.id]
+                                ? "focused"
+                                : "compact",
+                            },
                           );
                           await load();
                           await after();

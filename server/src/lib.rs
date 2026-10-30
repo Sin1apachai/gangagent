@@ -2,6 +2,7 @@ mod admin;
 mod application;
 mod auth;
 mod collaboration;
+mod context_engine;
 mod domain;
 mod infrastructure;
 mod master_data;
@@ -144,6 +145,7 @@ pub async fn run() {
                 .merge(master_data::routes())
                 .merge(recruitment::routes())
                 .merge(quota::routes())
+        .merge(context_engine::routes())
                 .merge(personal_workers::routes()),
         )
         .fallback(|| async { Error(StatusCode::NOT_FOUND, "API route not found") })

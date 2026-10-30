@@ -87,14 +87,14 @@ pub(super) fn materialize(dir: &FsPath, raw: &str) -> WorkerResult<String> {
     }
     Ok(output.summary)
 }
-pub(super) fn context(dir: &FsPath) -> WorkerResult<String> {
+pub(super) fn context(dir: &FsPath, skip: &[String]) -> WorkerResult<String> {
     let mut files = vec![];
     let mut total = 0;
     collect_files(dir, dir, &mut files, &mut total, 0)?;
     let mut included = Vec::new();
     let mut budget = 120000;
     for (name, size) in files {
-        if size > 60000 || size as usize > budget || name == "result.md" {
+        if size > 60000 || size as usize > budget || name == "result.md" || skip.contains(&name) {
             continue;
         }
         if let Ok(content) = std::fs::read_to_string(dir.join(&name)) {
