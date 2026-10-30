@@ -40,6 +40,7 @@ export type Agent = {
   role: string;
   instructions: string;
   provider: string;
+  model?: string | null;
   office_placement?: "auto" | "common" | "room";
   office_room_id?: string | null;
   enabled: boolean;

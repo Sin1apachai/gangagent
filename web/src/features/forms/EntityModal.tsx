@@ -91,6 +91,29 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
         .then(setProjects)
         .catch(() => {});
   }, [wid, modal?.kind]);
+  const [agentProvider, setAgentProvider] = useState("codex"),
+    [agentModel, setAgentModel] = useState("");
+  const [modelChoices, setModelChoices] = useState<
+    Record<string, { id: string; name: string }[]>
+  >({});
+  useEffect(() => {
+    setAgentProvider(modal?.value?.provider ?? "codex");
+    setAgentModel(modal?.value?.model ?? "");
+  }, [modal?.kind, modal?.value?.id]);
+  useEffect(() => {
+    if (modal?.kind !== "agent") return;
+    let live = true;
+    api<Record<string, { id: string; name: string }[]>>("/models")
+      .then((c) => {
+        if (live) setModelChoices(c);
+      })
+      .catch(() => {
+        if (live) setModelChoices({});
+      });
+    return () => {
+      live = false;
+    };
+  }, [modal?.kind, modal?.value?.id]);
   const [taskProject, setTaskProject] = useState("");
   useEffect(() => {
     setTaskProject(modal?.value?.project_id ?? "");
@@ -186,6 +209,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                   delete body.agent_room;
                   body.enabled = f.enabled === "on";
                   body.character_id = character;
+                  body.model = agentModel;
                   if (v?.id) {
                     method = "PUT";
                     body.version = v.version;
@@ -418,6 +442,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                               (f.get("enabled") === "on") !== v.enabled ||
                               birthDate !== (v.birth_date ?? "") ||
                               character !== (v.character_id ?? 0) ||
+                              agentModel !== (v.model ?? "") ||
                               String(f.get("agent_room") ?? "auto") !==
                                 originalRoom;
                             if (changed) {
@@ -469,12 +494,61 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                         เครื่องมือ
                         <select
                           name="provider"
-                          defaultValue={modal.value?.provider ?? "codex"}
+                          value={agentProvider}
+                          onChange={(e) => {
+                            setAgentProvider(e.target.value);
+                            setAgentModel("");
+                          }}
                         >
                           <option value="codex">Codex</option>
                           <option value="claude">Claude</option>
                         </select>
                       </label>
+                      <label>
+                        โมเดล AI
+                        <select
+                          name="model"
+                          value={agentModel}
+                          onChange={(e) => setAgentModel(e.target.value)}
+                        >
+                          <option value="">ค่าเริ่มต้นของผู้ให้บริการ</option>
+                          {(modelChoices[agentProvider] ?? []).map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                          {agentModel &&
+                            !(modelChoices[agentProvider] ?? []).some(
+                              (m) => m.id === agentModel,
+                            ) && (
+                              <option value={agentModel}>
+                                {agentModel} · ตัวเลือกเดิม
+                              </option>
+                            )}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          api<Record<string, { id: string; name: string }[]>>(
+                            "/models",
+                          )
+                            .then(setModelChoices)
+                            .catch(() =>
+                              setError(
+                                "โหลดรายชื่อโมเดลไม่สำเร็จ ตรวจว่า Worker ออนไลน์แล้วลองอีกครั้ง",
+                              ),
+                            )
+                        }
+                      >
+                        รีเฟรชรายชื่อโมเดล
+                      </button>
+                      <p className="form-section-help">
+                        เลือกตามสิทธิ์และโควตาบัญชีที่เชื่อมต่อ รายชื่อ Codex
+                        จาก Worker อาจยังไม่ใช่รายการล่าสุด
+                        งานที่เริ่มแล้วจะคงตัวเลือกโมเดลเดิม
+                      </p>
                       <label className="check">
                         <input
                           type="checkbox"

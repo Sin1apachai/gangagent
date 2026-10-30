@@ -95,7 +95,10 @@ export function TaskUsage({
       </p>
       <p>
         Agent: {detail.task.execution_context?.agent?.name || "ไม่ได้มอบหมาย"} ·
-        {detail.task.provider === "claude" ? "Input ไม่รวม cache" : "Input รวมที่รายงาน"}: {total("input_tokens")} · Output รวมที่รายงาน:{" "}
+        {detail.task.provider === "claude"
+          ? "Input ไม่รวม cache"
+          : "Input รวมที่รายงาน"}
+        : {total("input_tokens")} · Output รวมที่รายงาน:{" "}
         {total("output_tokens")}
       </p>
       <p>
@@ -118,6 +121,14 @@ export function TaskUsage({
               รอบ {detail.runs.length - i} · {r.status}
             </h4>
             <dl>
+              <dt>โมเดลที่ร้องขอ</dt>
+              <dd>
+                {typeof m.requested_model === "string"
+                  ? m.requested_model === "provider_default"
+                    ? "ค่าเริ่มต้นของผู้ให้บริการ"
+                    : m.requested_model
+                  : "ไม่ได้บันทึกตัวเลือกโมเดล"}
+              </dd>
               <dt>แหล่งข้อมูล</dt>
               <dd>
                 {m.source === "provider"
@@ -136,7 +147,13 @@ export function TaskUsage({
                     {count(m.knowledge_candidates)}
                   </dd>
                   <dt>วิธีเลือก</dt>
-                  <dd>{m.knowledge_selection === "lexical_rank_v1" ? "เลือกจากคำที่เกี่ยวข้องกับงาน" : m.knowledge_selection === "full" ? "ข้อมูลตามเดิม" : "กลับไปใช้ข้อมูลตามเดิม"}</dd>
+                  <dd>
+                    {m.knowledge_selection === "lexical_rank_v1"
+                      ? "เลือกจากคำที่เกี่ยวข้องกับงาน"
+                      : m.knowledge_selection === "full"
+                        ? "ข้อมูลตามเดิม"
+                        : "กลับไปใช้ข้อมูลตามเดิม"}
+                  </dd>
                   <dt>ลดข้อมูลประกอบจากแบบเต็ม (bytes)</dt>
                   <dd>
                     {count(m.context_saved_bytes)}{" "}

@@ -7,6 +7,7 @@ mod context_engine;
 mod domain;
 mod infrastructure;
 mod master_data;
+mod model_selection;
 mod monitoring;
 mod organization;
 mod personal_workers;
@@ -151,6 +152,7 @@ pub async fn run() {
                 .merge(provider_login::routes())
                 .merge(collaboration::routes())
                 .merge(organization::routes())
+                .merge(model_selection::routes())
                 .merge(master_data::routes())
                 .merge(recruitment::routes())
                 .merge(quota::routes())

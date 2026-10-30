@@ -163,6 +163,16 @@ fn provider_args(provider: &str) -> Vec<String> {
         _ => vec![],
     }
 }
+fn provider_model_args(provider: &str, model: Option<&str>) -> WorkerResult<Vec<String>> {
+    let mut args = provider_args(provider);
+    if let Some(id) = model {
+        if id.is_empty() || !crate::model_selection::valid_id(provider, id) {
+            return Err("Invalid provider model selection".into());
+        }
+        args.extend(["--model".to_string(), id.to_string()]);
+    }
+    Ok(args)
+}
 async fn auth(provider: &str, fixture: bool) -> Provider {
     if fixture {
         return Provider {
@@ -230,7 +240,12 @@ async fn heartbeat(db: &PgPool, uid: Uuid, id: &str, fixture: bool) -> WorkerRes
         status.authenticated = false;
         status.method = "reauth_required".into();
     }
-    sqlx::query("INSERT INTO workers(id,user_id,mode,providers,resources) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET user_id=EXCLUDED.user_id,mode=EXCLUDED.mode,providers=EXCLUDED.providers,resources=EXCLUDED.resources,heartbeat_at=now()").bind(id).bind(uid).bind(if fixture{"fixture"}else{"subscription_cli"}).bind(json!(p)).bind(crate::resource_metrics::node()).execute(db).await?;
+    let mut inventory = json!(p);
+    for provider in ["codex", "claude"] {
+        inventory[provider]["models"] =
+            json!(crate::model_selection::worker_choices(provider, fixture));
+    }
+    sqlx::query("INSERT INTO workers(id,user_id,mode,providers,resources) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET user_id=EXCLUDED.user_id,mode=EXCLUDED.mode,providers=EXCLUDED.providers,resources=EXCLUDED.resources,heartbeat_at=now()").bind(id).bind(uid).bind(if fixture{"fixture"}else{"subscription_cli"}).bind(inventory).bind(crate::resource_metrics::node()).execute(db).await?;
     Ok(p)
 }
 async fn bounded_read<R: tokio::io::AsyncRead + Unpin>(mut reader: R) -> Vec<u8> {
@@ -708,9 +723,17 @@ async fn execute(
     if j.provider == "codex" {
         std::fs::write(&schema_path, serde_json::to_vec(&codex_files::schema())?)?;
     }
+    let selected = crate::model_selection::frozen(j.execution_context.as_ref());
+    if selected.is_some_and(|m| !crate::model_selection::valid_id(&j.provider, m)) {
+        return Ok((
+            "failed".into(),
+            String::new(),
+            "Selected model is invalid for this provider".into(),
+        ));
+    }
     let mut command = child(&j.provider, dir);
     command
-        .args(provider_args(&j.provider))
+        .args(provider_model_args(&j.provider, selected)?)
         .stdin(Stdio::piped());
     if j.provider == "codex" {
         command.arg("--output-schema").arg(&schema_path);
@@ -1021,7 +1044,10 @@ pub async fn run_worker() -> WorkerResult<()> {
         if let Some(j) = claim(&db, uid).await? {
             let run = Uuid::new_v4();
             let dir = prepare_dir(run)?;
-            let (p, context_metrics) = prompt(&db, &j).await?;
+            let (p, mut context_metrics) = prompt(&db, &j).await?;
+            context_metrics["requested_model"] =
+                json!(crate::model_selection::frozen(j.execution_context.as_ref())
+                    .unwrap_or("provider_default"));
             let mut tx = db.begin().await?;
             sqlx::query("UPDATE tasks SET current_run_id=$1 WHERE id=$2 AND status='running'")
                 .bind(run)
@@ -1080,6 +1106,18 @@ pub async fn run_worker() -> WorkerResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn model_arguments_preserve_subscription_auth_and_reject_cross_provider_values() {
+        let args = provider_model_args("codex", Some("gpt-6.1-sol")).unwrap();
+        assert!(args.windows(2).any(|a| a == ["--model", "gpt-6.1-sol"]));
+        assert!(args.contains(&"forced_login_method=\"chatgpt\"".to_string()));
+        assert_eq!(
+            provider_model_args("claude", None).unwrap(),
+            provider_args("claude")
+        );
+        assert!(provider_model_args("claude", Some("fable")).is_err());
+        assert!(provider_model_args("codex", Some("gpt-6.1-sol --config bad")).is_err());
+    }
     #[test]
     fn revision_files_reject_escape_symlinks_and_changed_sizes() {
         let root = std::env::temp_dir().join(format!("office-copy-test-{}", Uuid::new_v4()));

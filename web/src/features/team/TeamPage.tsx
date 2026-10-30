@@ -141,6 +141,9 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
                           ? "รอรีเซ็ต"
                           : "ว่าง"}
                   </span>
+                  <p className="muted">
+                    โมเดล: {a.model || "ค่าเริ่มต้นผู้ให้บริการ"}
+                  </p>
                   <p className="agent-instructions">
                     {a.instructions || "ยังไม่มีคำสั่งประจำตัว"}
                   </p>

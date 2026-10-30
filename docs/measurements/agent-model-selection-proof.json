@@ -1,0 +1,16 @@
+{
+  "production_existing_domain_tables_preserved": 29,
+  "model_selection_schema_version": 20,
+  "new_model_column_present": true,
+  "existing_agents_keep_provider_default": true,
+  "fixture_model_tests_passed": 3,
+  "baseline_http_tests_passed": 86,
+  "rust_tests_passed": 32,
+  "frontend_tests_passed": 13,
+  "browser_codex_save_verified": true,
+  "browser_provider_change_resets_model": true,
+  "browser_claude_save_verified": true,
+  "live_provider_inference_calls": 0,
+  "production_model_catalog_verified": true,
+  "app_worker_backup_binaries_match": true
+}
