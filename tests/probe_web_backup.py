@@ -27,7 +27,7 @@ for provider in ('codex','claude'):ok(call(c,'/connections/'+provider,{'enabled'
 wid=ok(call(c,'/workspaces',{'name':'Web backup restore proof'}))['id'];base='/workspaces/'+wid
 marker='RESTORE_PROOF_'+uuid.uuid4().hex
 kid=ok(call(c,base+'/knowledge',{'title':'Restore proof knowledge','content':marker,'source':'Synthetic isolated recovery test','verified':True}))['id']
-aid=ok(call(c,base+'/agents',{'name':'Backup proof agent','role':'Verifier','instructions':'Keep the proof marker','provider':'codex','enabled':True,'x':4,'y':4,'birth_date':'2000-03-21'}))['id']
+aid=ok(call(c,base+'/agents',{'name':'Backup proof agent','role':'Verifier','instructions':'Keep the proof marker','provider':'codex','enabled':True,'birth_date':'2000-03-21'}))['id']
 sid=ok(call(c,base+'/skills',{'title':'Restore proof skill','description':'Synthetic','instructions':'Retain evidence','input_contract':'Brief','output_contract':'Proof','acceptance_criteria':'Marker intact'}))['id']
 wfid=ok(call(c,base+'/workflows',{'title':'Restore proof workflow','description':'Synthetic','steps':[{'title':'Proof','description':'Retain source evidence','agent_id':aid,'depends_on':[],'required_files':['result.md']}]}))['id']
 tid=ok(call(c,base+'/tasks',{'title':'Restore proof task','description':marker,'provider':'codex','agent_id':aid}))['id'];path=base+'/tasks/'+tid

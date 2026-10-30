@@ -1,0 +1,12 @@
+{
+  "agent_xy_columns_removed": true,
+  "existing_agent_fields_preserved": true,
+  "existing_agents_default_to_auto": true,
+  "model_calls": 0,
+  "production_agent_xy_columns_removed": true,
+  "production_existing_agent_fields_preserved": true,
+  "production_users_connections_master_unchanged": true,
+  "browser_room_dropdown_verified": true,
+  "browser_map_selection_verified": true,
+  "browser_drag_between_rooms_verified": true
+}

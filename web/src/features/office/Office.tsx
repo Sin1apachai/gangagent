@@ -24,6 +24,8 @@ export function Office({
   tasks = [],
   onAgent,
   onOpen,
+  onRoomPick,
+  onAgentMove,
 }: {
   items: Furniture[];
   rooms?: Room[];
@@ -34,7 +36,10 @@ export function Office({
   tasks?: Task[];
   onAgent?: (a: Agent) => void;
   onOpen?: (kind: string) => void;
+  onRoomPick?: (room: Room | undefined) => void;
+  onAgentMove?: (agent: Agent, room: Room | undefined) => void;
 }) {
+  const agentDrag = useRef<{ agent: Agent; start: Cell } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
     drag = useRef<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null),
@@ -256,9 +261,14 @@ export function Office({
           const working = task?.status === "running";
           const epoch = Math.floor(now / 8000);
           const room = new RoomEngine(rooms).assigned(agent);
+          const seed = [...agent.id].reduce(
+            (n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0,
+            0,
+          );
+          const home = { x: seed % 20, y: Math.floor(seed / 20) % 12 };
           const goal =
             working || reduced
-              ? engine.nearest(agent, room, !room)
+              ? engine.nearest(home, room, !room)
               : engine.nearest(
                   {
                     x: (index * 5 + epoch * 3) % 20,
@@ -270,7 +280,7 @@ export function Office({
           const target = `${goal.x},${goal.y}`;
           let p = positions.current[agent.id];
           if (!p) {
-            const start = engine.nearest(agent, room, !room);
+            const start = engine.nearest(home, room, !room);
             p = positions.current[agent.id] = {
               ...start,
               path: [],
@@ -403,6 +413,11 @@ export function Office({
             const p = cell(e),
               i = engine.hit(p.x, p.y);
             setCursor(p);
+            if (onRoomPick) {
+              if (p.x >= 0 && p.x < 20 && p.y >= 0 && p.y < 12)
+                onRoomPick(rooms.find((r) => RoomEngine.contains(r, p.x, p.y)));
+              return;
+            }
             if (edit) {
               if (i) {
                 setSelected(i.id);
@@ -416,11 +431,31 @@ export function Office({
                   at && Math.abs(at.x - p.x) < 1 && Math.abs(at.y - p.y) < 1
                 );
               });
-              if (a) onAgent?.(a);
+              if (a && onAgentMove) {
+                agentDrag.current = { agent: a, start: p };
+                canvas.current?.setPointerCapture(e.pointerId);
+              } else if (a) onAgent?.(a);
               else if (i) onOpen?.(i.kind);
             }
           }}
+          onPointerCancel={() => {
+            agentDrag.current = null;
+            drag.current = null;
+          }}
           onPointerUp={(e) => {
+            if (agentDrag.current) {
+              const { agent, start } = agentDrag.current;
+              agentDrag.current = null;
+              const end = cell(e);
+              if (Math.abs(start.x - end.x) + Math.abs(start.y - end.y) >= 1) {
+                if (end.x >= 0 && end.x < 20 && end.y >= 0 && end.y < 12)
+                  onAgentMove?.(
+                    agent,
+                    rooms.find((r) => RoomEngine.contains(r, end.x, end.y)),
+                  );
+              } else onAgent?.(agent);
+              return;
+            }
             if (drag.current) {
               const p = cell(e),
                 old = items.find((i) => i.id === drag.current);
@@ -483,6 +518,12 @@ export function Office({
         </p>
       )}
       {hint && <p role="status">{hint}</p>}
+      {!edit && onAgentMove && (
+        <p className="muted">
+          ลากตัวละครไปยังห้องเพื่อย้าย หรือเปิดแก้ไข Agent
+          เพื่อเลือกห้องจากรายการ ระบบเลือกจุดว่างให้เอง
+        </p>
+      )}
       {!edit && (
         <div className="agent-shortcuts">
           {agents

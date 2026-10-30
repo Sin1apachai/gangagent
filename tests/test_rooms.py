@@ -33,3 +33,17 @@ class Rooms(unittest.TestCase):
   i={'id':'desk','kind':'desk','x':1,'y':2,'rotation':0}
   self.ok(self.save([self.room()],[i]));self.ok(self.save([],[i]));self.assertEqual(self.snap()['layout']['items'],[i])
   self.ok(call(self.admin,self.path+'/layout',{'version':self.snap()['layout_version'],'layout':{'items':[i]}},'PUT'));self.assertEqual(self.snap()['layout']['rooms'],[])
+ def test_agent_room_selection_without_coordinates_and_deleted_room_fallback(self):
+  r=self.room();self.ok(self.save([r]));body={'name':'Room-based agent','role':'Engineer','instructions':'Use room placement','provider':'codex','enabled':True,'office_placement':'room','office_room_id':r['id']}
+  aid=self.ok(call(self.admin,self.path+'/agents',body))['id'];a=self.snap()['agents'][0]
+  self.assertNotIn('x',a);self.assertNotIn('y',a);self.assertEqual(a['office_room_id'],r['id'])
+  # An older client that omits placement must preserve an existing room assignment.
+  legacy={k:v for k,v in body.items() if not k.startswith('office_')};legacy['version']=a['version'];self.ok(call(self.admin,self.path+'/agents/'+aid,legacy,'PUT'));a=self.snap()['agents'][0];self.assertEqual(a['office_room_id'],r['id'])
+  self.ok(self.save([]));a=self.snap()['agents'][0];self.assertEqual(a['office_placement'],'auto');self.assertIsNone(a['office_room_id']);self.assertGreater(a['version'],legacy['version'])
+  self.assertEqual(call(self.admin,self.path+'/agents/'+aid,{**body,'version':a['version']},'PUT')[0],400)
+ def test_room_assignment_rejects_foreign_and_invalid_modes(self):
+  body={'name':'Automatic agent','role':'Engineer','instructions':'','provider':'codex','enabled':True}
+  aid=self.ok(call(self.admin,self.path+'/agents',body))['id'];a=self.snap()['agents'][0];self.assertEqual(a['office_placement'],'auto');self.assertIsNone(a['office_room_id'])
+  foreign=self.ok(call(self.admin,'/workspaces',{'name':'Foreign rooms'}))['id'];self.ok(call(self.admin,'/workspaces/'+foreign+'/layout',{'version':0,'layout':{'items':[],'rooms':[self.room()]}},'PUT'))
+  for extra in [{'office_placement':'room','office_room_id':'engineering'},{'office_placement':'room'},{'office_placement':'auto','office_room_id':'engineering'},{'office_placement':'invalid'}]:self.assertEqual(call(self.admin,self.path+'/agents',{**body,**extra})[0],400)
+  self.ok(call(self.admin,self.path+'/agents/'+aid,{**body,'version':a['version'],'office_placement':'common','office_room_id':None},'PUT'));self.assertEqual(self.snap()['agents'][0]['office_placement'],'common')

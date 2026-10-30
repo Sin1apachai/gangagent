@@ -25,7 +25,7 @@ class Organization(unittest.TestCase):
  def send(self,suffix,data=None,method=None,c=None):return call(c or self.admin,self.base+suffix,data,method)
  def ok(self,response):self.assertEqual(response[0],200,response);return response[1]
  def agent(self,name='Builder'):
-  return self.ok(self.send('/agents',{'name':name,'role':'Engineer','instructions':'ROLE_ORIGINAL','provider':'codex','x':4,'y':5,'enabled':True}))['id']
+  return self.ok(self.send('/agents',{'name':name,'role':'Engineer','instructions':'ROLE_ORIGINAL','provider':'codex','enabled':True}))['id']
  def skill(self,marker='SKILL_ORIGINAL'):
   body={'title':'Engineering playbook','description':'Reusable methods','instructions':marker,'input_contract':'Source brief','output_contract':'Reviewable artifact','acceptance_criteria':'Evidence required'}
   return self.ok(self.send('/skills',body))['id'],body
@@ -64,7 +64,7 @@ class Organization(unittest.TestCase):
   agents=[self.agent('Member '+str(i)) for i in range(12)]
   for i in range(1,len(agents)):self.ok(self.org(agents[i],agents[i-1]))
   self.assertEqual(self.org(agents[0],agents[-1])[0],400);self.assertEqual(self.org(agents[0],agents[0])[0],400)
-  foreign=self.ok(call(self.admin,'/workspaces',{'name':'Foreign org'}))['id'];aid=self.ok(call(self.admin,'/workspaces/'+foreign+'/agents',{'name':'Foreign','role':'Lead','instructions':'','provider':'codex','x':2,'y':2,'enabled':True}))['id']
+  foreign=self.ok(call(self.admin,'/workspaces',{'name':'Foreign org'}))['id'];aid=self.ok(call(self.admin,'/workspaces/'+foreign+'/agents',{'name':'Foreign','role':'Lead','instructions':'','provider':'codex','enabled':True}))['id']
   self.assertEqual(self.org(agents[0],aid)[0],400)
   self.ok(self.send('/agents/'+agents[5],method='DELETE'));self.assertEqual(self.org(agents[0],agents[-1])[0],400)
   self.ok(self.send('/agents/'+agents[5]+'/restore',{}));self.assertEqual(len(self.get('/organization')[1]['agents']),12)
@@ -153,7 +153,7 @@ class Organization(unittest.TestCase):
 
 
  def test_agent_character_selection_persists_and_validates(self):
-  body={'name':'Character selection','role':'Designer','instructions':'Keep appearance','provider':'codex','x':4,'y':5,'enabled':True,'character_id':11}
+  body={'name':'Character selection','role':'Designer','instructions':'Keep appearance','provider':'codex','enabled':True,'character_id':11}
   aid=self.ok(self.send('/agents',body))['id']
   row=next(a for a in self.get()[1]['agents'] if a['id']==aid);self.assertEqual(row['character_id'],11)
   self.ok(self.send('/agents/'+aid,{**body,'character_id':5,'version':row['version']},'PUT'))

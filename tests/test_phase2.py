@@ -65,11 +65,11 @@ class PhaseTwo(unittest.TestCase):
   self.assertEqual(call(self.admin,base+'/'+kid,method='DELETE')[0],200);self.assertFalse(self.snap()['knowledge'])
   self.assertEqual(call(self.admin,base+'/'+kid+'/restore',{})[0],200);self.assertEqual(self.snap()['knowledge'][0]['content'],'edited')
  def test_agent_crud_and_provider_validation(self):
-  path=f'/workspaces/{self.wid}/agents';b={'name':'Real user agent','role':'Builder','instructions':'Use concise output','provider':'claude','x':4,'y':5,'enabled':True}
+  path=f'/workspaces/{self.wid}/agents';b={'name':'Real user agent','role':'Builder','instructions':'Use concise output','provider':'claude','enabled':True}
   _,a=call(self.admin,path,b);aid=a['id'];b['name']='Updated agent';b['version']=0
   self.assertEqual(call(self.admin,path+'/'+aid,b,'PUT')[0],200);self.assertEqual(call(self.admin,path+'/'+aid,b,'PUT')[0],409)
   self.assertEqual(call(self.admin,f'/workspaces/{self.wid}/tasks',{'title':'Mismatch','description':'','provider':'codex','agent_id':aid})[0],400)
-  self.assertEqual(call(self.admin,path,{**b,'x':20})[0],400)
+  self.assertEqual(call(self.admin,path,{**b,'office_placement':'invalid'})[0],400)
   self.assertEqual(call(self.admin,path+'/'+aid,method='DELETE')[0],200);self.assertFalse(self.snap()['agents'])
   self.assertEqual(call(self.admin,path+'/'+aid+'/restore',{})[0],200);self.assertEqual(self.snap()['agents'][0]['name'],'Updated agent')
  def test_viewer_and_membership_controls(self):
@@ -154,7 +154,7 @@ class PhaseTwo(unittest.TestCase):
    self.wait(tid,'cancelled')
   finally:call(self.admin,'/connections/codex',{'enabled':True,'billing_acknowledged':True},'PUT')
  def test_deleted_agent_cannot_be_used_to_start_a_task(self):
-  path=f'/workspaces/{self.wid}/agents';_,a=call(self.admin,path,{'name':'Temporary agent','role':'Builder','instructions':'','provider':'codex','x':1,'y':1,'enabled':True})
+  path=f'/workspaces/{self.wid}/agents';_,a=call(self.admin,path,{'name':'Temporary agent','role':'Builder','instructions':'','provider':'codex','enabled':True})
   tid=self.task(agent_id=a['id']);call(self.admin,path+'/'+a['id'],method='DELETE')
   self.assertEqual(self.start(tid)[0],409)
 
@@ -249,7 +249,7 @@ class PhaseTwo(unittest.TestCase):
   self.assertEqual(call(self.admin,base+'/'+pid+'/restore',{})[0],200)
  def test_team_dependencies_require_acceptance_and_handoff(self):
   path=f'/workspaces/{self.wid}/agents'
-  aid=call(self.admin,path,{'name':'Team builder','role':'Builder','instructions':'','provider':'codex','x':0,'y':0,'enabled':True})[1]['id']
+  aid=call(self.admin,path,{'name':'Team builder','role':'Builder','instructions':'','provider':'codex','enabled':True})[1]['id']
   steps=[{'title':'First step','description':'TEAM_HANDOFF_MARKER','agent_id':aid,'depends_on':[]},{'title':'Review previous','description':'Use upstream accepted result','agent_id':aid,'depends_on':[0]}]
   base=f'/workspaces/{self.wid}/plans'
   status,p=call(self.admin,base,{'goal':'Team acceptance','steps':steps});self.assertEqual(status,200)
@@ -265,7 +265,7 @@ class PhaseTwo(unittest.TestCase):
   self.assertEqual(call(self.admin,base+'/'+p['id']+'/cancel',{})[0],200)
  def test_plan_cycles_and_foreign_agents_are_rejected(self):
   path=f'/workspaces/{self.wid}/plans'
-  aid=call(self.admin,f'/workspaces/{self.wid}/agents',{'name':'Planner','role':'Manager','instructions':'','provider':'claude','x':0,'y':0,'enabled':True})[1]['id']
+  aid=call(self.admin,f'/workspaces/{self.wid}/agents',{'name':'Planner','role':'Manager','instructions':'','provider':'claude','enabled':True})[1]['id']
   bad=[{'title':'Cycle','description':'','agent_id':aid,'depends_on':[0]}]
   self.assertEqual(call(self.admin,path,{'goal':'Cycle','steps':bad})[0],400)
   self.assertEqual(call(self.admin,path,{'goal':'Too many','steps':[dict(bad[0],depends_on=[]) for _ in range(9)]})[0],400)

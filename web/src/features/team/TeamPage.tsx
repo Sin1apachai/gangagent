@@ -1,3 +1,4 @@
+import { RoomEngine } from "../office/domain/RoomEngine";
 import { PersonnelNavigation } from "../personnel/PersonnelNavigation";
 import { SelectionRibbon } from "../personnel/AgentPersonality";
 import "../personnel/personnel.css";
@@ -144,7 +145,13 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
                     {a.instructions || "ยังไม่มีคำสั่งประจำตัว"}
                   </p>
                   <small>
-                    ตำแหน่ง ({a.x}, {a.y})
+                    ห้อง:{" "}
+                    {new RoomEngine(data.layout.rooms ?? []).assigned(a)
+                      ?.name ?? "ส่วนกลาง"}
+                    {a.office_placement === undefined ||
+                    a.office_placement === "auto"
+                      ? " · จัดอัตโนมัติ"
+                      : ""}
                   </small>
                   {canWrite && (
                     <div className="actions">

@@ -8,7 +8,7 @@ class Personnel(unittest.TestCase):
  get=support.Organization.get;send=support.Organization.send;ok=support.Organization.ok;agent=support.Organization.agent
  task=support.Organization.task;detail=support.Organization.detail;start=support.Organization.start;wait=support.Organization.wait;review=support.Organization.review
  workflow=support.Organization.workflow;step=support.Organization.step;approve=support.Organization.approve;member=support.Organization.member
- def body(self,**extra):return {'name':'Personality candidate','role':'Engineer','instructions':'Work with evidence','provider':'codex','x':4,'y':5,'enabled':True,**extra}
+ def body(self,**extra):return {'name':'Personality candidate','role':'Engineer','instructions':'Work with evidence','provider':'codex','enabled':True,**extra}
  def test_master_data_is_seeded_without_sample_agents(self):
   self.assertEqual(call(client(),'/master-data')[0],401)
   m=self.ok(call(self.admin,'/master-data'));self.assertEqual(len(m['zodiac']),12);self.assertEqual(len(m['rule']),12);self.assertEqual(len(m['trait']),12);self.assertEqual(sum(c['weight'] for c in m['criterion']),100)

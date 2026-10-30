@@ -214,6 +214,27 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
               onChange={setItems}
               agents={data.agents}
               tasks={data.tasks}
+              onAgentMove={
+                canWrite && !edit && !busy
+                  ? (agent, room) => {
+                      run(async () => {
+                        await api(
+                          `/workspaces/${wid}/agents/${agent.id}`,
+                          {
+                            ...agent,
+                            office_placement: room ? "room" : "common",
+                            office_room_id: room?.id ?? null,
+                          },
+                          "PUT",
+                        );
+                        await refresh();
+                        setMessage(
+                          `ย้าย ${agent.name} ไป${room?.name ?? "พื้นที่ส่วนกลาง"}แล้ว`,
+                        );
+                      });
+                    }
+                  : undefined
+              }
               onAgent={(a) => {
                 if (edit) return;
                 setPage("team");

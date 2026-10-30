@@ -15,7 +15,7 @@ wid=ok(call(c,'/workspaces',{'name':'Usage pilot '+uuid.uuid4().hex[:6]}))['id']
 rows=[]
 try:
  for provider in ('codex','claude'):
-  aid=ok(call(c,base+'/agents',{'name':'Usage pilot '+provider,'role':'Contract verifier','instructions':'Use the assigned specification exactly. Do not use shell or network.','provider':provider,'enabled':True,'x':4,'y':5,'birth_date':'2000-03-21'}))['id']
+  aid=ok(call(c,base+'/agents',{'name':'Usage pilot '+provider,'role':'Contract verifier','instructions':'Use the assigned specification exactly. Do not use shell or network.','provider':provider,'enabled':True,'birth_date':'2000-03-21'}))['id']
   ids=[]
   for n in range(4):
    sid=ok(call(c,base+'/skills',{'title':'Contract '+str(n),'description':'Benchmark contract','instructions':'Keep all field values exact. Preserve significant spaces inside strings.','input_contract':'The task brief','output_contract':'answer.json','acceptance_criteria':'Exact JSON equality, no extra fields'}))['id'];ids.append({'skill_id':sid,'pinned_version':0})

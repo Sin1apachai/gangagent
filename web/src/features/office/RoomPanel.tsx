@@ -99,7 +99,7 @@ export function RoomPanel({
                     a.enabled && new RoomEngine(rooms).assigned(a)?.id === r.id,
                 ).length
               }{" "}
-              Agent ประจำฝ่าย · จุดเริ่ม ({r.x + 1}, {r.y + 1})
+              Agent ประจำห้อง · จุดเริ่ม ({r.x + 1}, {r.y + 1})
             </small>
             {edit && (
               <div className="room-actions">
@@ -254,7 +254,7 @@ export function RoomPanel({
       )}
       <p className="muted">
         ห้องช่วยจัดตำแหน่งทีม ไม่ได้เปลี่ยนสิทธิ์เข้าถึงข้อมูลหรือ Workflow ·
-        Agent ที่ไม่มีฝ่ายตรงกันใช้พื้นที่ส่วนกลาง ·
+        โหมดอัตโนมัติใช้ห้องตามฝ่าย หากไม่พบจะใช้ส่วนกลาง เลือกห้องเองได้ที่ Team ·
         เปลี่ยนฝ่ายได้ที่โครงสร้างทีม
       </p>
     </section>

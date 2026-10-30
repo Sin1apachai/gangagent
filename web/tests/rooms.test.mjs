@@ -20,3 +20,9 @@ test('room spacing, duplicate department and boundary doors rejected',()=>{
  for(const rooms of [[room,{...room,id:'two',department:'Design',x:6}],[room,{...room,id:'two',x:8}],[{...room,door_side:'north'}]])assert.notEqual(new RoomEngine(rooms).validate([]),'');
  assert.equal(new RoomEngine([room,{...room,id:'two',department:'Design',x:8}]).validate([]),'');
 });
+test('explicit room overrides department and common mode stays outside department rooms',()=>{
+ const e=new RoomEngine([room,{...room,id:'design',name:'Design',department:'Design',x:8}]);
+ assert.equal(e.assigned({department:'Engineering',office_placement:'room',office_room_id:'design'})?.id,'design');
+ assert.equal(e.assigned({department:'Engineering',office_placement:'common'}),undefined);
+ assert.equal(e.assigned({department:'Engineering',office_placement:'auto'})?.id,'eng');
+});

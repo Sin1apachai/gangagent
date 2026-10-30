@@ -5,8 +5,8 @@ pub(crate) struct AgentForm {
     role: String,
     instructions: String,
     provider: String,
-    x: i32,
-    y: i32,
+    office_placement: Option<String>,
+    office_room_id: Option<String>,
     enabled: bool,
     version: Option<i32>,
     #[serde(default)]
@@ -20,10 +20,12 @@ pub(crate) fn check_agent(b: &AgentForm) -> Result<()> {
         || !valid(&b.role, 200)
         || b.instructions.len() > 20000
         || !matches!(b.provider.as_str(), "codex" | "claude")
-        || !(0..20).contains(&b.x)
-        || !(0..12).contains(&b.y)
+        || b.office_placement
+            .as_deref()
+            .is_some_and(|m| !matches!(m, "auto" | "common" | "room"))
+        || b.office_room_id.as_ref().is_some_and(|id| !valid(id, 80))
     {
-        Err(bad("Invalid agent fields or office coordinates"))
+        Err(bad("Invalid agent fields or room selection"))
     } else {
         Ok(())
     }
@@ -49,7 +51,12 @@ pub(crate) async fn create_agent(
     let id = Uuid::new_v4();
     let birth = b.birth_date.as_deref().unwrap_or("");
     let personality = master_data::generate(&a.db, id, birth).await?;
-    sqlx::query("INSERT INTO agents(id,workspace_id,name,role,instructions,provider,x,y,enabled,character_id,birth_date,personality) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)").bind(id).bind(wid).bind(b.name).bind(b.role).bind(b.instructions).bind(b.provider).bind(b.x).bind(b.y).bind(b.enabled).bind(b.character_id.unwrap_or(0)).bind(if birth.is_empty(){None}else{Some(birth)}).bind(personality).execute(&a.db).await?;
+    let mut tx = a.db.begin().await?;
+    organization::lock_workspace(&mut tx, wid).await?;
+    let mode = b.office_placement.as_deref().unwrap_or("auto");
+    validate_room(&mut tx, wid, mode, b.office_room_id.as_deref()).await?;
+    sqlx::query("INSERT INTO agents(id,workspace_id,name,role,instructions,provider,enabled,character_id,birth_date,personality,office_placement,office_room_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)").bind(id).bind(wid).bind(&b.name).bind(&b.role).bind(&b.instructions).bind(&b.provider).bind(b.enabled).bind(b.character_id.unwrap_or(0)).bind(if birth.is_empty(){None}else{Some(birth)}).bind(personality).bind(mode).bind(&b.office_room_id).execute(&mut *tx).await?;
+    tx.commit().await?;
     audit(&a, &u, Some(wid), "agent.created").await?;
     Ok(Json(json!({"id":id})))
 }
@@ -75,8 +82,39 @@ pub(crate) async fn edit_agent(
     };
     let mut tx = a.db.begin().await?;
     organization::lock_workspace(&mut tx, wid).await?;
-    let n=sqlx::query("UPDATE agents SET name=$1,role=$2,instructions=$3,provider=$4,x=$5,y=$6,enabled=$7,character_id=coalesce($11,character_id),birth_date=$12,personality=$13,version=version+1 WHERE id=$8 AND workspace_id=$9 AND version=$10 AND deleted_at IS NULL").bind(b.name).bind(b.role).bind(b.instructions).bind(b.provider).bind(b.x).bind(b.y).bind(b.enabled).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.character_id).bind(if requested.is_empty(){None}else{Some(requested)}).bind(personality).execute(&mut *tx).await?.rows_affected();
+    let old_room:Option<(String,Option<String>)>=sqlx::query_as("SELECT office_placement,office_room_id FROM agents WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL").bind(id).bind(wid).fetch_optional(&mut *tx).await?;
+    let (old_mode, old_room) = old_room.ok_or(bad("Agent unavailable"))?;
+    let mode = b.office_placement.as_deref().unwrap_or(&old_mode);
+    let room = if b.office_placement.is_none() {
+        old_room.as_deref()
+    } else {
+        b.office_room_id.as_deref()
+    };
+    validate_room(&mut tx, wid, mode, room).await?;
+    let n=sqlx::query("UPDATE agents SET name=$1,role=$2,instructions=$3,provider=$4,enabled=$5,character_id=coalesce($9,character_id),birth_date=$10,personality=$11,office_placement=$12,office_room_id=$13,version=version+1 WHERE id=$6 AND workspace_id=$7 AND version=$8 AND deleted_at IS NULL").bind(&b.name).bind(&b.role).bind(&b.instructions).bind(&b.provider).bind(b.enabled).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.character_id).bind(if requested.is_empty(){None}else{Some(requested)}).bind(personality).bind(mode).bind(room).execute(&mut *tx).await?.rows_affected();
     tx.commit().await?;
     audit(&a, &u, Some(wid), "agent.updated").await?;
     changed(n)
+}
+
+async fn validate_room(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    wid: Uuid,
+    mode: &str,
+    room: Option<&str>,
+) -> Result<()> {
+    if mode != "room" {
+        return if room.is_none() {
+            Ok(())
+        } else {
+            Err(bad("Select a room only in room mode"))
+        };
+    }
+    let id = room.ok_or(bad("Choose an office room"))?;
+    let exists:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workspaces w CROSS JOIN LATERAL jsonb_array_elements(coalesce(w.layout->'rooms','[]'::jsonb)) r WHERE w.id=$1 AND r->>'id'=$2)").bind(wid).bind(id).fetch_one(&mut **tx).await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(bad("Room is unavailable in this workspace"))
+    }
 }

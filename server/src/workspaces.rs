@@ -244,7 +244,13 @@ pub(crate) async fn layout(
             "Invalid layout: check room spacing, doors and furniture",
         ));
     }
-    let version:Option<i32>=sqlx::query_scalar("UPDATE workspaces SET layout=$1,layout_version=layout_version+1 WHERE id=$2 AND layout_version=$3 RETURNING layout_version").bind(sqlx::types::Json(b.layout)).bind(wid).bind(b.version).fetch_optional(&a.db).await?;
+    let mut tx = a.db.begin().await?;
+    organization::lock_workspace(&mut tx, wid).await?;
+    let version:Option<i32>=sqlx::query_scalar("UPDATE workspaces SET layout=$1,layout_version=layout_version+1 WHERE id=$2 AND layout_version=$3 RETURNING layout_version").bind(sqlx::types::Json(b.layout)).bind(wid).bind(b.version).fetch_optional(&mut *tx).await?;
+    if version.is_some() {
+        sqlx::query("UPDATE agents a SET office_placement='auto',office_room_id=NULL,version=version+1 WHERE workspace_id=$1 AND office_placement='room' AND NOT EXISTS(SELECT 1 FROM workspaces w CROSS JOIN LATERAL jsonb_array_elements(coalesce(w.layout->'rooms','[]'::jsonb)) r WHERE w.id=a.workspace_id AND r->>'id'=a.office_room_id)").bind(wid).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
     match version {
         Some(v) => Ok(Json(json!({"version":v}))),
         None => Err(Error(

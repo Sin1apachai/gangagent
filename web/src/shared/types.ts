@@ -41,8 +41,8 @@ export type Agent = {
   role: string;
   instructions: string;
   provider: string;
-  x: number;
-  y: number;
+  office_placement?: "auto" | "common" | "room";
+  office_room_id?: string | null;
   enabled: boolean;
   version: number;
 };

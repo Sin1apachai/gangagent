@@ -53,6 +53,9 @@ export class RoomEngine {
     );
   }
   assigned(agent: Agent) {
+    if (agent.office_placement === "common") return undefined;
+    if (agent.office_placement === "room")
+      return this.rooms.find((r) => r.id === agent.office_room_id);
     return this.rooms.find(
       (r) =>
         r.department.trim() &&

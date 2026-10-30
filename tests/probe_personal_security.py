@@ -64,7 +64,7 @@ try:
   time.sleep(1)
  else:raise AssertionError('Fixture worker unavailable')
  assert call(member,'/connections/codex' ,{'enabled':True,'billing_acknowledged':True},'PUT')[0]==200
- aid=call(member,f'/workspaces/{wid}/agents',{'name':'Personal Skill Agent','role':'Builder','instructions':'Follow assigned skills','provider':'codex','enabled':True,'x':4,'y':4})[1]['id']
+ aid=call(member,f'/workspaces/{wid}/agents',{'name':'Personal Skill Agent','role':'Builder','instructions':'Follow assigned skills','provider':'codex','enabled':True})[1]['id']
  sid=call(member,f'/workspaces/{wid}/skills',{'title':'Personal playbook','instructions':'PERSONAL_SKILL_CONTEXT'})[1]['id']
  assert call(member,f'/workspaces/{wid}/agents/{aid}/organization',{'version':0,'manager_id':None,'skills':[{'skill_id':sid,'pinned_version':0}]},'PUT')[0]==200
  tid=call(member,f'/workspaces/{wid}/tasks' ,{'title':'Personal worker actual acceptance','description':'Return fixture output','provider':'codex','agent_id':aid})[1]['id']

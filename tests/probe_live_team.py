@@ -6,7 +6,7 @@ c=client();assert call(c,'/auth/login',{'email':os.environ['OWNER_EMAIL'],'passw
 wid=call(c,'/workspaces',{'name':'Team acceptance '+uuid.uuid4().hex[:8]})[1]['id']
 agents=[]
 for provider,role in [('codex','Producer and planner'),('claude','Reviewer')]:
- s,a=call(c,f'/workspaces/{wid}/agents',{'name':'Acceptance '+provider,'role':role,'instructions':'Follow the exact file acceptance criteria; do not use network or install tools.','provider':provider,'x':len(agents)*3+2,'y':3,'enabled':True});assert s==200;agents.append(a['id'])
+ s,a=call(c,f'/workspaces/{wid}/agents',{'name':'Acceptance '+provider,'role':role,'instructions':'Follow the exact file acceptance criteria; do not use network or install tools.','provider':provider,'enabled':True});assert s==200;agents.append(a['id'])
 marker='OFFICE_TEAM_'+uuid.uuid4().hex[:12]
 goal=f'Create EXACTLY TWO sequential steps and no others. Step 0 assigned to agent {agents[0]}: produce UTF-8 source.txt containing exactly {marker}. Step 1 assigned to agent {agents[1]}, depends_on [0]: read the accepted source.txt from inputs/<parent-task>/source.txt, verify its marker, and create verified.txt with exactly the same content. This second step is the review/final summary step. No shell commands, no installs, no network.'
 s,p=call(c,f'/workspaces/{wid}/plans',{'goal':goal,'manager_agent_id':agents[0],'steps':[]});assert s==200

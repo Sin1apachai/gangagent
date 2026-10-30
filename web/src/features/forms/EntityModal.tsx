@@ -1,3 +1,4 @@
+import { AgentRoomPicker } from "../office/AgentRoomPicker";
 import { AgentPersonality } from "../personnel/AgentPersonality";
 import React, { useState, useEffect } from "react";
 import { FormTabs } from "../../shared/FormTabs";
@@ -111,7 +112,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                 setAgentTab(
                   name === "birth_date"
                     ? "personality"
-                    : ["x", "y", "instructions"].includes(name)
+                    : ["agent_room", "instructions"].includes(name)
                       ? "instructions"
                       : "profile",
                 );
@@ -171,8 +172,14 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                 if (m.kind === "agent") {
                   endpoint =
                     `/workspaces/${wid}/agents` + (v?.id ? "/" + v.id : "");
-                  body.x = Number(f.x);
-                  body.y = Number(f.y);
+                  const room = String(f.agent_room ?? "auto");
+                  body.office_placement = room.startsWith("room:")
+                    ? "room"
+                    : room;
+                  body.office_room_id = room.startsWith("room:")
+                    ? room.slice(5)
+                    : null;
+                  delete body.agent_room;
                   body.enabled = f.enabled === "on";
                   body.character_id = character;
                   if (v?.id) {
@@ -395,7 +402,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                         { id: "profile", label: "ข้อมูลทั่วไป" },
                         { id: "appearance", label: "ตัวละคร" },
                         { id: "personality", label: "วันเกิดและบุคลิก" },
-                        { id: "instructions", label: "คำสั่งและตำแหน่ง" },
+                        { id: "instructions", label: "คำสั่งและห้อง" },
                       ]}
                     />
                     <div
@@ -513,7 +520,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                     </div>
                     <div
                       role="tabpanel"
-                      aria-label="คำสั่งและตำแหน่ง"
+                      aria-label="คำสั่งและห้อง"
                       hidden={agentTab !== "instructions"}
                     >
                       {" "}
@@ -522,22 +529,12 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                         name="instructions"
                         value={modal.value?.instructions}
                       />
-                      <div className="coordinate-fields">
-                        <Field
-                          label="ตำแหน่ง X (0–19)"
-                          name="x"
-                          type="number"
-                          value={modal.value?.x ?? 2}
-                          required
-                        />
-                        <Field
-                          label="ตำแหน่ง Y (0–11)"
-                          name="y"
-                          type="number"
-                          value={modal.value?.y ?? 3}
-                          required
-                        />
-                      </div>
+                      <AgentRoomPicker
+                        key={modal.value?.id ?? "new"}
+                        agent={modal.value}
+                        rooms={data?.layout.rooms ?? []}
+                        items={data?.layout.items ?? []}
+                      />
                     </div>
                   </>
                 )}
