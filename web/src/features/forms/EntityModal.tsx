@@ -91,10 +91,12 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
         .catch(() => {});
   }, [wid, modal?.kind]);
   const [agentTab, setAgentTab] = useState("profile"),
-    [character, setCharacter] = useState(0);
+    [character, setCharacter] = useState(0),
+    [birthDate, setBirthDate] = useState("");
   useEffect(() => {
     setAgentTab("profile");
     setCharacter(modal?.value?.character_id ?? 0);
+    setBirthDate(modal?.value?.birth_date ?? "");
   }, [modal?.kind, modal?.value?.id]);
   if (!user) return null;
   return (
@@ -439,13 +441,65 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                       aria-label="วันเกิดและบุคลิก"
                       hidden={agentTab !== "personality"}
                     >
-                      <Field
-                        label="วันเกิด Agent"
-                        name="birth_date"
-                        type="date"
-                        value={modal.value?.birth_date ?? ""}
+                      <label>
+                        วันเกิด Agent
+                        <input
+                          name="birth_date"
+                          type="date"
+                          value={birthDate}
+                          onChange={(e) => setBirthDate(e.target.value)}
+                        />
+                      </label>
+                      <div
+                        className="actions"
+                        style={{ marginTop: 12, marginBottom: 16 }}
+                      >
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            const today = new Date();
+                            const first =
+                              Date.UTC(today.getFullYear() - 60, 0, 1) /
+                              86400000;
+                            const last =
+                              Date.UTC(
+                                today.getFullYear() - 18,
+                                today.getMonth(),
+                                today.getDate(),
+                              ) / 86400000;
+                            const days = last - first + 1;
+                            const limit = Math.floor(4294967296 / days) * days;
+                            const value = new Uint32Array(1);
+                            let next = "";
+                            do {
+                              do {
+                                crypto.getRandomValues(value);
+                              } while (value[0] >= limit);
+                              next = new Date(
+                                (first + (value[0] % days)) * 86400000,
+                              )
+                                .toISOString()
+                                .slice(0, 10);
+                            } while (next === birthDate);
+                            setBirthDate(next);
+                          }}
+                        >
+                          🎲 สุ่มวันเกิด
+                        </button>
+                      </div>
+                      {birthDate !== (modal.value?.birth_date ?? "") && (
+                        <p role="status" className="form-section-help">
+                          เปลี่ยนวันเกิดแล้ว ระบบจะคำนวณบุคลิกใหม่เมื่อกดบันทึก
+                        </p>
+                      )}
+                      <AgentPersonality
+                        agent={
+                          birthDate === (modal.value?.birth_date ?? "")
+                            ? modal.value
+                            : undefined
+                        }
                       />
-                      <AgentPersonality agent={modal.value} />
                     </div>
                     <div
                       role="tabpanel"

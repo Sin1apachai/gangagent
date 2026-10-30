@@ -388,3 +388,7 @@ and Thai segmentation support; pin essential sources and retain human review.
 ![ปุ่มยืนยันล้างประวัติในระบบทดสอบ](docs/images/clear-notifications.jpg)
 
 การทดสอบปุ่มล้าง: ผ่าน 4 HTTP tests ของ monitoring, 29 Rust tests และ 7 frontend domain/rendering tests พร้อมตรวจแยกประวัติผู้ดูแลสองบัญชี ([หลักฐาน](docs/measurements/clear-notifications-proof.json)) และทดสอบกดยกเลิก/ยืนยันจากหน้าจอจริง
+
+สุ่มวันเกิด Agent ได้ที่ **Team → เพิ่ม/แก้ไข Agent → วันเกิดและบุคลิก → 🎲 สุ่มวันเกิด** กดสุ่มใหม่หรือแก้วันที่เองได้ แล้วกดบันทึกเพื่อคำนวณบุคลิกจาก master data เดิม วันที่ไม่เปลี่ยนเองเมื่อเปิดระบบใหม่ ระบบสุ่มเฉพาะวันที่ในปฏิทิน ไม่เรียก AI
+
+![ปุ่มสุ่มวันเกิดและบุคลิกที่บันทึกแล้วในระบบทดสอบ](docs/images/random-birthday.jpg)
