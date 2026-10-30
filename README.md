@@ -382,3 +382,9 @@ and Thai segmentation support; pin essential sources and retain human review.
 ![ตัวอย่างออฟฟิศหลายห้องจากระบบทดสอบ](docs/images/office-rooms.jpg)
 
 [ผลการทดสอบระบบแบ่งห้อง](docs/office-rooms-report.md)
+
+ล้างประวัติแจ้งเตือนได้จาก **กระดิ่งขวาบน → ล้างประวัติ → ยืนยันล้างประวัติ** ล้างเฉพาะรายการที่สิ้นสุดแล้วจากบัญชีของคุณ ไม่กระทบประวัติของผู้ดูแลคนอื่น คำเตือนที่ยังเกิดอยู่จะคงแสดงจนกว่าปัญหาจะสิ้นสุด ปุ่มจะปิดเมื่อไม่มีประวัติที่ล้างได้
+
+![ปุ่มยืนยันล้างประวัติในระบบทดสอบ](docs/images/clear-notifications.jpg)
+
+การทดสอบปุ่มล้าง: ผ่าน 4 HTTP tests ของ monitoring, 29 Rust tests และ 7 frontend domain/rendering tests พร้อมตรวจแยกประวัติผู้ดูแลสองบัญชี ([หลักฐาน](docs/measurements/clear-notifications-proof.json)) และทดสอบกดยกเลิก/ยืนยันจากหน้าจอจริง

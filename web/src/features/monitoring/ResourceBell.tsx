@@ -10,7 +10,10 @@ export function ResourceBell({
   onOpenSettings: () => void;
 }) {
   const [open, setOpen] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [confirmClear, setConfirmClear] = useState(false),
+    [clearing, setClearing] = useState(false),
+    [message, setMessage] = useState("");
   const root = useRef<HTMLDivElement>(null),
     button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -40,7 +43,12 @@ export function ResourceBell({
         aria-label={`การแจ้งเตือนทรัพยากร${unread ? ` · ยังไม่อ่าน ${unread} รายการ` : ""}`}
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          setConfirmClear(false);
+          setError("");
+          setMessage("");
+        }}
       >
         <svg
           width="20"
@@ -80,8 +88,8 @@ export function ResourceBell({
             </p>
           )}
           <p>
-            การเตือนที่ยังไม่สิ้นสุด {m.data?.active_count ?? "—"} รายการ · ยังไม่อ่าน{" "}
-            {unread} รายการ
+            การเตือนที่ยังไม่สิ้นสุด {m.data?.active_count ?? "—"} รายการ ·
+            ยังไม่อ่าน {unread} รายการ
           </p>
           <div className="actions">
             <button
@@ -93,6 +101,16 @@ export function ResourceBell({
               อ่านทั้งหมด
             </button>
             <button
+              disabled={clearing || !m.data?.clearable_count}
+              onClick={() => {
+                setConfirmClear(true);
+                setError("");
+                setMessage("");
+              }}
+            >
+              ล้างประวัติ
+            </button>
+            <button
               onClick={() => {
                 m.openSettings();
                 onOpenSettings();
@@ -102,6 +120,41 @@ export function ResourceBell({
               เปิดหน้าทรัพยากร
             </button>
           </div>
+          {confirmClear && (
+            <div className="resource-clear-confirm">
+              <p>
+                ล้างประวัติที่สิ้นสุดแล้วจากบัญชีของคุณ?
+                คำเตือนที่ยังมีปัญหาจะคงอยู่ และไม่กระทบผู้ดูแลคนอื่น
+              </p>
+              <div className="actions">
+                <button
+                  disabled={clearing}
+                  onClick={async () => {
+                    setClearing(true);
+                    setError("");
+                    try {
+                      await m.clearHistory();
+                      setConfirmClear(false);
+                      setMessage("ล้างประวัติแล้ว");
+                    } catch {
+                      setError("ล้างประวัติไม่สำเร็จ กรุณาลองอีกครั้ง");
+                    } finally {
+                      setClearing(false);
+                    }
+                  }}
+                >
+                  {clearing ? "กำลังล้าง…" : "ยืนยันล้างประวัติ"}
+                </button>
+                <button
+                  disabled={clearing}
+                  onClick={() => setConfirmClear(false)}
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          )}
+          {message && <p role="status">{message}</p>}
           {error && <p role="alert">{error}</p>}
           <div className="resource-notices">
             {m.data?.notifications.map((n) => (

@@ -49,20 +49,22 @@ pub(crate) fn routes() -> Router<App> {
         .route("/admin/resources", get(status))
         .route("/admin/resources/settings", axum::routing::put(save))
         .route("/admin/resources/notifications/read", post(mark_read))
+        .route("/admin/resources/notifications/clear", post(clear_history))
 }
 async fn status(State(a): State<App>, h: HeaderMap) -> Result<Json<Value>> {
     let u = admin(&a, &h).await?;
     let config:Value=sqlx::query_scalar("SELECT jsonb_build_object('version',version,'settings',settings) FROM resource_settings WHERE id").fetch_one(&a.db).await?;
     let state:Option<Value>=sqlx::query_scalar("SELECT jsonb_build_object('sample',sample,'collected_at',collected_at,'stale',collected_at<now()-interval '20 seconds') FROM resource_state WHERE id").fetch_optional(&a.db).await?;
-    let notifications:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(n)||jsonb_build_object('read',EXISTS(SELECT 1 FROM resource_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1)) FROM resource_notifications n ORDER BY created_at DESC,id LIMIT 100").bind(u.id).fetch_all(&a.db).await?;
+    let notifications:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(n)||jsonb_build_object('read',EXISTS(SELECT 1 FROM resource_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1)) FROM resource_notifications n WHERE NOT EXISTS(SELECT 1 FROM resource_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1 AND r.cleared) ORDER BY created_at DESC,id LIMIT 100").bind(u.id).fetch_all(&a.db).await?;
     let unread:i64=sqlx::query_scalar("SELECT count(*) FROM resource_notifications n WHERE NOT EXISTS(SELECT 1 FROM resource_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1)").bind(u.id).fetch_one(&a.db).await?;
+    let clearable:i64=sqlx::query_scalar("SELECT count(*) FROM resource_notifications n WHERE (kind='recovery' OR resolved_at IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM resource_notification_reads r WHERE r.notification_id=n.id AND r.user_id=$1 AND r.cleared)").bind(u.id).fetch_one(&a.db).await?;
     let active: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM resource_notifications WHERE kind='warning' AND resolved_at IS NULL",
     )
     .fetch_one(&a.db)
     .await?;
     Ok(Json(
-        json!({"config":config,"state":state,"notifications":notifications,"unread_count":unread,"active_count":active,"scope":"Docker Linux VM and cgroups, not physical macOS host","sample_interval_seconds":5}),
+        json!({"config":config,"state":state,"notifications":notifications,"unread_count":unread,"active_count":active,"clearable_count":clearable,"scope":"Docker Linux VM and cgroups, not physical macOS host","sample_interval_seconds":5}),
     ))
 }
 #[derive(Deserialize)]
@@ -98,6 +100,31 @@ async fn mark_read(State(a): State<App>, h: HeaderMap, Json(b): Json<Read>) -> R
     }
     sqlx::query("INSERT INTO resource_notification_reads(user_id,notification_id) SELECT $1,id FROM resource_notifications WHERE $2 OR id=ANY($3) ON CONFLICT DO NOTHING").bind(u.id).bind(b.all).bind(b.ids).execute(&a.db).await?;
     Ok(Json(json!({"ok":true})))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ClearHistory {
+    confirmed: bool,
+}
+async fn clear_history(
+    State(a): State<App>,
+    h: HeaderMap,
+    Json(b): Json<ClearHistory>,
+) -> Result<Json<Value>> {
+    let u = admin(&a, &h).await?;
+    if !b.confirmed {
+        return Err(bad("Confirm clearing resolved notification history"));
+    }
+    let mut tx = a.db.begin().await?;
+    let n=sqlx::query("INSERT INTO resource_notification_reads(user_id,notification_id,cleared) SELECT $1,id,true FROM resource_notifications WHERE kind='recovery' OR resolved_at IS NOT NULL ON CONFLICT(user_id,notification_id) DO UPDATE SET cleared=true WHERE NOT resource_notification_reads.cleared").bind(u.id).execute(&mut *tx).await?.rows_affected();
+    sqlx::query(
+        "INSERT INTO audit_events(user_id,action) VALUES($1,'monitoring.notifications.cleared')",
+    )
+    .bind(u.id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Json(json!({"cleared":n})))
 }
 #[derive(Clone)]
 struct Metric {

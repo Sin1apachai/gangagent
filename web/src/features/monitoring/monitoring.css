@@ -203,3 +203,15 @@
     align-items: start;
   }
 }
+
+.resource-clear-confirm {
+  padding: 14px;
+  margin: 14px 0;
+  background: #f4e8d0;
+  border: 1px solid #bba57a;
+  line-height: 1.7;
+}
+.resource-popover .actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}

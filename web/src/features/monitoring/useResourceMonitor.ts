@@ -76,6 +76,7 @@ export type ResourceData = {
   notifications: Notice[];
   unread_count: number;
   active_count: number;
+  clearable_count: number;
 };
 export function useResourceMonitor(userId: string | null) {
   const [data, setData] = useState<ResourceData | null>(null),
@@ -169,6 +170,11 @@ export function useResourceMonitor(userId: string | null) {
         : d,
     );
   }
+  async function clearHistory() {
+    await api("/admin/resources/notifications/clear", { confirmed: true });
+    setToast(null);
+    await refresh.current();
+  }
   async function save(version: number, settings: ResourceSettings) {
     await api("/admin/resources/settings", { version, settings }, "PUT");
     await refresh.current();
@@ -180,6 +186,7 @@ export function useResourceMonitor(userId: string | null) {
     toast,
     dismissToast: () => setToast(null),
     markRead,
+    clearHistory,
     save,
     refresh: () => refresh.current(),
     openRequest,

@@ -27,6 +27,8 @@ class Monitoring(unittest.TestCase):
   self.assertEqual(call(other,'/admin/resources')[0],403)
   self.assertEqual(call(other,'/admin/resources/settings',config,'PUT')[0],403)
   self.assertEqual(call(other,'/admin/resources/notifications/read',{'all':True})[0],403)
+  self.assertEqual(call(other,'/admin/resources/notifications/clear',{'confirmed':True})[0],403)
+  self.assertEqual(call(client(),'/admin/resources/notifications/clear',{'confirmed':True})[0],401)
  def test_threshold_validation_and_version_conflicts(self):
   c=self.get()['config']
   variants=[]
@@ -52,9 +54,16 @@ class Monitoring(unittest.TestCase):
   self.assertIsNotNone(warning);self.assertFalse(warning['read']);self.assertGreaterEqual(current['unread_count'],1)
   time.sleep(6);current=self.get();self.assertEqual(len([n for n in current['notifications'] if n['resource_key']==key and n['kind']=='warning' and n['resolved_at'] is None]),1)
   self.ok(call(self.admin,'/admin/resources/notifications/read',{'ids':[warning['id']]}));self.assertTrue(next(n for n in self.get()['notifications'] if n['id']==warning['id'])['read'])
+  self.assertEqual(call(self.admin,'/admin/resources/notifications/clear',{'confirmed':False})[0],400)
+  self.ok(call(self.admin,'/admin/resources/notifications/clear',{'confirmed':True}));self.assertTrue(any(n['id']==warning['id'] for n in self.get()['notifications']))
   c=self.get()['config'];s['rules'][key]['enabled']=False;self.ok(call(self.admin,'/admin/resources/settings',{'version':c['version'],'settings':s},'PUT'))
   for _ in range(100):
    current=self.get();recovered=[n for n in current['notifications'] if n['resource_key']==key and n['kind']=='recovery' and n['reason']=='rule_disabled']
    if recovered:break
    time.sleep(.15)
   self.assertTrue(recovered);self.assertIsNotNone(next(n for n in current['notifications'] if n['id']==warning['id'])['resolved_at'])
+
+  self.assertGreaterEqual(self.get()['clearable_count'],2)
+  self.ok(call(self.admin,'/admin/resources/notifications/clear',{'confirmed':True}))
+  current=self.get();self.assertFalse(any(n['id']==warning['id'] for n in current['notifications']));self.assertEqual(current['clearable_count'],0);self.assertEqual(current['unread_count'],0)
+  self.assertEqual(self.ok(call(self.admin,'/admin/resources/notifications/clear',{'confirmed':True}))['cleared'],0)
