@@ -282,3 +282,32 @@ Fixture tests ไม่เรียก AI จริง ส่วน live accepta
 - [ที่มาของภาพและฟอนต์](docs/design/README.md)
 
 ภาพในคู่มือนี้เป็นภาพจากระบบที่ใช้งาน/ทดสอบแล้ว งานใน Workspace ชื่อ Acceptance เป็นงานตรวจระบบ ไม่ใช่ข้อมูลที่จะถูกสร้างให้เมื่อติดตั้งใหม่ ภาพ Settings ไม่แสดงรหัสผ่าน token หรือรหัสยืนยัน
+
+### Run usage and the first context optimization
+
+Open a task → **การใช้ Token**. Each run records provider-reported input/output,
+cache counters (when available), provider elapsed time, and UTF-8 prompt bytes.
+Missing counters stay unavailable; fixture workers never invent token usage.
+Historical runs have no retroactive statistics. Codex cached input is included in
+its input count; Claude uncached input and cache read/write are separate. Do not
+add Codex cache reads to its input again, compare providers as if their counters
+had identical meanings, or convert these counters into a Pro quota percentage.
+Prompt bytes cover the application's submitted text, not hidden provider prompts,
+subsequent tool reads, or the whole provider context.
+
+The initial optimization serializes frozen role/Skill JSON compactly, preserving
+all values including whitespace inside instruction strings. This removes formatting
+only; selective knowledge retrieval and generated handoff summaries are future
+work. `POST /api/workspaces/{wid}/tasks` accepts `context_format: "pretty"` for an
+explicit baseline or `"compact"` (default). The choice is fixed at creation.
+
+For an opt-in live pilot, run `tests/probe_usage.py` with `BASE_URL`, owner login
+variables, and `OFFICE_TEST_TARGET=live_owner` in a trusted environment. It makes
+four subscription CLI calls, one baseline and one compact run per provider, checks
+downloaded `answer.json` by exact JSON equality, and archives its temporary
+workspace. Never print or commit login variables. The report is written to
+`/private/tmp/office-usage-pilot.json`. This small pilot is descriptive, not evidence
+of a general percentage saving. Compare input/output, cache and quality separately;
+repeat with representative multi-step work before broad conclusions.
+
+Measured live results and limitations: [Context usage pilot](docs/context-usage-report.md).

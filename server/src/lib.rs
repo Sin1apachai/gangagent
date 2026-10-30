@@ -4,8 +4,11 @@ mod auth;
 mod collaboration;
 mod domain;
 mod infrastructure;
+mod master_data;
 mod organization;
 mod personal_workers;
+mod quota;
+mod recruitment;
 mod workspaces;
 use admin::*;
 use auth::*;
@@ -13,6 +16,7 @@ use workspaces::*;
 mod phase2;
 mod provider_login;
 mod worker;
+mod usage;
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
@@ -87,6 +91,9 @@ pub async fn run() {
         .run(&db)
         .await
         .expect("Migration failed");
+    master_data::import(&db)
+        .await
+        .expect("Master data import failed");
     let email = std::env::var("OWNER_EMAIL")
         .expect("OWNER_EMAIL required")
         .trim()
@@ -118,6 +125,7 @@ pub async fn run() {
             .unwrap(),
     };
     personal_workers::reconcile(app.clone());
+    quota::scheduler(app.db.clone());
     let api = Router::new()
         .route("/health", get(health))
         .route("/auth/login", post(login))
@@ -133,6 +141,9 @@ pub async fn run() {
                 .merge(provider_login::routes())
                 .merge(collaboration::routes())
                 .merge(organization::routes())
+                .merge(master_data::routes())
+                .merge(recruitment::routes())
+                .merge(quota::routes())
                 .merge(personal_workers::routes()),
         )
         .fallback(|| async { Error(StatusCode::NOT_FOUND, "API route not found") })

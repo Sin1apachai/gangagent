@@ -1,3 +1,4 @@
+import { AgentPersonality } from "../personnel/AgentPersonality";
 import React, { useEffect, useState } from "react";
 import type { OfficeController } from "../../application/useOfficeController";
 import type { Reviewer } from "../organization/types";
@@ -33,6 +34,9 @@ export function TaskExecutionContext({ ctx }: { ctx: OfficeController }) {
           )}
           {frozen.agent?.decision_scope && (
             <p>ขอบเขตตัดสินใจ: {frozen.agent.decision_scope}</p>
+          )}
+          {frozen.agent?.personality && (
+            <AgentPersonality agent={frozen.agent} />
           )}
           <div>
             {frozen.skills.map((s, i) => (

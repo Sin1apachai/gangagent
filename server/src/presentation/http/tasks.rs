@@ -1,6 +1,8 @@
 use super::*;
 #[derive(Deserialize)]
 pub struct TaskForm {
+    #[serde(default)]
+    pub context_format: Option<String>,
     pub title: String,
     pub description: String,
     pub provider: String,
@@ -16,6 +18,12 @@ fn normal_priority() -> String {
     "normal".into()
 }
 pub(crate) async fn check_task(a: &App, wid: Uuid, b: &TaskForm) -> Result<()> {
+    if b.context_format
+        .as_ref()
+        .is_some_and(|v| !matches!(v.as_str(), "compact" | "pretty"))
+    {
+        return Err(bad("Invalid context format"));
+    }
     if !valid(&b.title, 200)
         || b.description.len() > 20000
         || !matches!(b.provider.as_str(), "codex" | "claude")
@@ -53,7 +61,7 @@ pub(crate) async fn create_task(
     access(&a, &u, wid, true).await?;
     check_task(&a, wid, &b).await?;
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO tasks(id,workspace_id,title,description,provider,agent_id,created_by,project_id,priority,acceptance_criteria) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").bind(id).bind(wid).bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(u.id).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).execute(&a.db).await?;
+    sqlx::query("INSERT INTO tasks(id,workspace_id,title,description,provider,agent_id,created_by,project_id,priority,acceptance_criteria,context_format) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)").bind(id).bind(wid).bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(u.id).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).bind(b.context_format.unwrap_or_else(||"compact".into())).execute(&a.db).await?;
     audit(&a, &u, Some(wid), "task.created").await?;
     Ok(Json(json!({"id":id,"status":"queued"})))
 }
@@ -77,7 +85,7 @@ pub(crate) async fn task_detail(
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
     access(&a, &u, wid, false).await?;
-    let v=sqlx::query_scalar("SELECT json_build_object('task',row_to_json(t),'events',COALESCE((SELECT json_agg(e ORDER BY e.id) FROM task_events e WHERE task_id=t.id),'[]'::json),'runs',COALESCE((SELECT json_agg(json_build_object('id',r.id,'status',r.status,'started_at',r.started_at,'finished_at',r.finished_at,'result',r.result,'error',r.error) ORDER BY started_at DESC) FROM task_runs r WHERE task_id=t.id),'[]'::json),'artifacts',COALESCE((SELECT json_agg(a) FROM artifacts a WHERE task_id=t.id),'[]'::json)) FROM tasks t WHERE workspace_id=$1 AND id=$2 AND deleted_at IS NULL").bind(wid).bind(id).fetch_optional(&a.db).await?.ok_or(Error(StatusCode::NOT_FOUND,"Task not found"))?;
+    let v=sqlx::query_scalar("SELECT json_build_object('task',row_to_json(t),'events',COALESCE((SELECT json_agg(e ORDER BY e.id) FROM task_events e WHERE task_id=t.id),'[]'::json),'runs',COALESCE((SELECT json_agg(json_build_object('id',r.id,'status',r.status,'started_at',r.started_at,'finished_at',r.finished_at,'usage_metrics',r.usage_metrics,'result',r.result,'error',r.error) ORDER BY started_at DESC) FROM task_runs r WHERE task_id=t.id),'[]'::json),'artifacts',COALESCE((SELECT json_agg(a) FROM artifacts a WHERE task_id=t.id),'[]'::json)) FROM tasks t WHERE workspace_id=$1 AND id=$2 AND deleted_at IS NULL").bind(wid).bind(id).fetch_optional(&a.db).await?.ok_or(Error(StatusCode::NOT_FOUND,"Task not found"))?;
     Ok(Json(v))
 }
 #[derive(Deserialize)]
@@ -100,7 +108,7 @@ pub(crate) async fn run_task(
         .bind(wid)
         .fetch_one(&mut *tx)
         .await?;
-    let n=sqlx::query("UPDATE tasks t SET status='queued',execution_requested=true,cancel_requested=false,error='',version=version+1 WHERE workspace_id=$1 AND id=$2 AND created_by=$3 AND deleted_at IS NULL AND status IN ('queued','failed','cancelled','waiting_auth','waiting_quota','interrupted') AND NOT execution_requested AND attempts<3 AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND EXISTS(SELECT 1 FROM provider_connections c WHERE c.user_id=$3 AND c.provider=t.provider AND c.enabled AND c.billing_acknowledged)").bind(wid).bind(id).bind(u.id).execute(&mut *tx).await?.rows_affected();
+    let n=sqlx::query("UPDATE tasks t SET status='queued',execution_requested=true,cancel_requested=false,error='',next_quota_check_at=NULL,version=version+1 WHERE workspace_id=$1 AND id=$2 AND created_by=$3 AND deleted_at IS NULL AND status IN ('queued','failed','cancelled','waiting_auth','waiting_quota','interrupted') AND NOT execution_requested AND attempts<3 AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND EXISTS(SELECT 1 FROM provider_connections c WHERE c.user_id=$3 AND c.provider=t.provider AND c.enabled AND c.billing_acknowledged)").bind(wid).bind(id).bind(u.id).execute(&mut *tx).await?.rows_affected();
     if n > 0 {
         let (agent, context): (Option<Uuid>, Option<Value>) =
             sqlx::query_as("SELECT agent_id,execution_context FROM tasks WHERE id=$1 FOR UPDATE")

@@ -1,3 +1,12 @@
+export type Personality = {
+  birth_date: string;
+  master_version: number;
+  engine_version: number;
+  zodiac_id: string;
+  zodiac_name: string;
+  basis: string;
+  traits: { id: string; name: string; instructions: string; caution: string }[];
+};
 export type Furniture = {
   id: string;
   kind: string;
@@ -6,6 +15,10 @@ export type Furniture = {
   rotation: number;
 };
 export type Agent = {
+  birth_date?: string | null;
+  personality?: Personality | null;
+  selection_passed?: boolean | null;
+  selection_reason?: string;
   character_id?: number;
   manager_id?: string | null;
   department?: string;
@@ -22,6 +35,11 @@ export type Agent = {
   version: number;
 };
 export type Task = {
+  quota_auto_resume?: boolean;
+  quota_reset_at?: string | null;
+  next_quota_check_at?: string | null;
+  quota_check_minutes?: number;
+  quota_retries?: number;
   execution_context?: {
     agent: Agent | null;
     skills: {
@@ -92,6 +110,7 @@ export type Detail = {
   task: Task;
   events: { id: number; message: string; created_at: string }[];
   runs: {
+    usage_metrics?: Record<string, number | string | null>;
     id: string;
     status: string;
     result: string;

@@ -270,11 +270,18 @@ export function Office({
               dir,
               sy,
             );
+          if (agent.selection_passed === false) {
+            c.fillStyle = "#a74651";
+            c.fillRect(x - 5, y + 25, 42, 11);
+            c.fillStyle = "#fff9ed";
+            c.font = "9px sans-serif";
+            c.fillText("ไม่ผ่าน", x + 4, y + 34);
+          }
           const label =
             agent.name +
             " · " +
             (task?.status === "waiting_quota"
-              ? "รอโควตา"
+              ? "รอรีเซ็ต"
               : task?.status === "waiting_auth"
                 ? "รอ Login"
                 : task?.status === "review"

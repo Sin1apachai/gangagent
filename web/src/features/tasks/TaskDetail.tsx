@@ -1,3 +1,5 @@
+import { TaskUsage } from "./TaskUsage";
+import { TaskQuota } from "../personnel/TaskQuota";
 import { TaskExecutionContext } from "./TaskExecutionContext";
 import { TaskAttachments } from "./TaskAttachments";
 import React, { useEffect, useState } from "react";
@@ -117,8 +119,10 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 { id: "brief", label: "โจทย์และ Skill" },
                 { id: "result", label: "ผลงานและตรวจรับ" },
                 { id: "history", label: "ประวัติ" },
+                { id: "usage", label: "การใช้ Token" },
               ]}
             />
+            <div hidden={taskTab !== "usage"} role="tabpanel" aria-label="การใช้ Token"><TaskUsage detail={detail} /></div>
             <div
               role="tabpanel"
               aria-label="โจทย์และ Skill"
@@ -130,6 +134,7 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                   เกณฑ์ตรวจรับ: {detail.task.acceptance_criteria}
                 </p>
               )}
+              <TaskQuota ctx={ctx} />
               <TaskExecutionContext ctx={ctx} />
               <TaskAttachments ctx={ctx} />
               {detail.task.error && (

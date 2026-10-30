@@ -11,6 +11,6 @@ export const statusLabel: Record<string, string> = {
   failed: "ล้มเหลว",
   cancelled: "ยกเลิก",
   waiting_auth: "รอ Login",
-  waiting_quota: "รอโควตา",
+  waiting_quota: "รอรีเซ็ต",
   interrupted: "งานสะดุด",
 };

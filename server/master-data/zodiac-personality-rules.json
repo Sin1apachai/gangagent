@@ -1,0 +1,362 @@
+[
+  {
+    "id": "aries",
+    "zodiac_id": "aries",
+    "core_traits": [
+      "decisive",
+      "collaborative"
+    ],
+    "pool": [
+      {
+        "trait_id": "patient",
+        "weight": 5
+      },
+      {
+        "trait_id": "curious",
+        "weight": 4
+      },
+      {
+        "trait_id": "empathetic",
+        "weight": 3
+      },
+      {
+        "trait_id": "direct",
+        "weight": 2
+      },
+      {
+        "trait_id": "methodical",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "taurus",
+    "zodiac_id": "taurus",
+    "core_traits": [
+      "patient",
+      "analytical"
+    ],
+    "pool": [
+      {
+        "trait_id": "curious",
+        "weight": 5
+      },
+      {
+        "trait_id": "empathetic",
+        "weight": 4
+      },
+      {
+        "trait_id": "direct",
+        "weight": 3
+      },
+      {
+        "trait_id": "methodical",
+        "weight": 2
+      },
+      {
+        "trait_id": "collaborative",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "gemini",
+    "zodiac_id": "gemini",
+    "core_traits": [
+      "curious",
+      "independent"
+    ],
+    "pool": [
+      {
+        "trait_id": "empathetic",
+        "weight": 5
+      },
+      {
+        "trait_id": "direct",
+        "weight": 4
+      },
+      {
+        "trait_id": "methodical",
+        "weight": 3
+      },
+      {
+        "trait_id": "collaborative",
+        "weight": 2
+      },
+      {
+        "trait_id": "analytical",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "cancer",
+    "zodiac_id": "cancer",
+    "core_traits": [
+      "empathetic",
+      "reflective"
+    ],
+    "pool": [
+      {
+        "trait_id": "direct",
+        "weight": 5
+      },
+      {
+        "trait_id": "methodical",
+        "weight": 4
+      },
+      {
+        "trait_id": "collaborative",
+        "weight": 3
+      },
+      {
+        "trait_id": "analytical",
+        "weight": 2
+      },
+      {
+        "trait_id": "independent",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "leo",
+    "zodiac_id": "leo",
+    "core_traits": [
+      "direct",
+      "adaptable"
+    ],
+    "pool": [
+      {
+        "trait_id": "methodical",
+        "weight": 5
+      },
+      {
+        "trait_id": "collaborative",
+        "weight": 4
+      },
+      {
+        "trait_id": "analytical",
+        "weight": 3
+      },
+      {
+        "trait_id": "independent",
+        "weight": 2
+      },
+      {
+        "trait_id": "reflective",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "virgo",
+    "zodiac_id": "virgo",
+    "core_traits": [
+      "methodical",
+      "creative"
+    ],
+    "pool": [
+      {
+        "trait_id": "collaborative",
+        "weight": 5
+      },
+      {
+        "trait_id": "analytical",
+        "weight": 4
+      },
+      {
+        "trait_id": "independent",
+        "weight": 3
+      },
+      {
+        "trait_id": "reflective",
+        "weight": 2
+      },
+      {
+        "trait_id": "adaptable",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "libra",
+    "zodiac_id": "libra",
+    "core_traits": [
+      "collaborative",
+      "decisive"
+    ],
+    "pool": [
+      {
+        "trait_id": "analytical",
+        "weight": 5
+      },
+      {
+        "trait_id": "independent",
+        "weight": 4
+      },
+      {
+        "trait_id": "reflective",
+        "weight": 3
+      },
+      {
+        "trait_id": "adaptable",
+        "weight": 2
+      },
+      {
+        "trait_id": "creative",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "scorpio",
+    "zodiac_id": "scorpio",
+    "core_traits": [
+      "analytical",
+      "patient"
+    ],
+    "pool": [
+      {
+        "trait_id": "independent",
+        "weight": 5
+      },
+      {
+        "trait_id": "reflective",
+        "weight": 4
+      },
+      {
+        "trait_id": "adaptable",
+        "weight": 3
+      },
+      {
+        "trait_id": "creative",
+        "weight": 2
+      },
+      {
+        "trait_id": "decisive",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "sagittarius",
+    "zodiac_id": "sagittarius",
+    "core_traits": [
+      "independent",
+      "curious"
+    ],
+    "pool": [
+      {
+        "trait_id": "reflective",
+        "weight": 5
+      },
+      {
+        "trait_id": "adaptable",
+        "weight": 4
+      },
+      {
+        "trait_id": "creative",
+        "weight": 3
+      },
+      {
+        "trait_id": "decisive",
+        "weight": 2
+      },
+      {
+        "trait_id": "patient",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "capricorn",
+    "zodiac_id": "capricorn",
+    "core_traits": [
+      "reflective",
+      "empathetic"
+    ],
+    "pool": [
+      {
+        "trait_id": "adaptable",
+        "weight": 5
+      },
+      {
+        "trait_id": "creative",
+        "weight": 4
+      },
+      {
+        "trait_id": "decisive",
+        "weight": 3
+      },
+      {
+        "trait_id": "patient",
+        "weight": 2
+      },
+      {
+        "trait_id": "curious",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "aquarius",
+    "zodiac_id": "aquarius",
+    "core_traits": [
+      "adaptable",
+      "direct"
+    ],
+    "pool": [
+      {
+        "trait_id": "creative",
+        "weight": 5
+      },
+      {
+        "trait_id": "decisive",
+        "weight": 4
+      },
+      {
+        "trait_id": "patient",
+        "weight": 3
+      },
+      {
+        "trait_id": "curious",
+        "weight": 2
+      },
+      {
+        "trait_id": "empathetic",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "id": "pisces",
+    "zodiac_id": "pisces",
+    "core_traits": [
+      "creative",
+      "methodical"
+    ],
+    "pool": [
+      {
+        "trait_id": "decisive",
+        "weight": 5
+      },
+      {
+        "trait_id": "patient",
+        "weight": 4
+      },
+      {
+        "trait_id": "curious",
+        "weight": 3
+      },
+      {
+        "trait_id": "empathetic",
+        "weight": 2
+      },
+      {
+        "trait_id": "direct",
+        "weight": 1
+      }
+    ]
+  }
+]

@@ -1,3 +1,4 @@
+import { PersonnelPage } from "./features/personnel/PersonnelPage";
 import { OrganizationPage } from "./features/organization/OrganizationPage";
 import { CollaborationPage } from "./features/collaboration/CollaborationPage";
 import { TaskDetail } from "./features/tasks/TaskDetail";
@@ -271,6 +272,8 @@ export default function App() {
                       tasks: "กระดานงาน",
                       knowledge: "คลังความรู้",
                       team: "ทีม Agent",
+                      recruitment: "คัดเลือกบุคลากร",
+                      master: "ข้อมูลพื้นฐานของระบบ",
                       skills: "คลัง Skill ของทีม",
                       organization: "โครงสร้างและบทบาทของทีม",
                       workflows: "กระบวนการทำงานของทีม",
@@ -291,6 +294,9 @@ export default function App() {
                       knowledge:
                         "รวบรวมสิ่งที่ทีมรู้ พร้อมค้นหาและตรวจสอบแหล่งที่มา",
                       team: "กำหนดบทบาทและเครื่องมือให้สมาชิกแต่ละคน",
+                      recruitment: "ประเมินตามตำแหน่งและหลักฐานจากงานทดลอง",
+                      master:
+                        "ราศี บุคลิก และเกณฑ์คัดเลือกที่ติดไปกับทุกการติดตั้ง",
                       skills: "สร้างความเชี่ยวชาญที่ใช้ซ้ำและเก็บประวัติได้",
                       organization:
                         "เห็นสายรายงาน หน้าที่ และขอบเขตของแต่ละ Agent",
@@ -340,7 +346,7 @@ export default function App() {
               API เสียเงิน ส่วนเครดิตเพิ่มเติมต้องปิดในบัญชีผู้ให้บริการ
             </div>
           </details>
-          {!wid && !["settings", "trash"].includes(page) && (
+          {!wid && !["settings", "trash", "master"].includes(page) && (
             <section className="empty big">
               <h3>เริ่มจากพื้นที่ว่างของคุณ</h3>
               <p>สร้าง Workspace เพื่อเพิ่มงาน ความรู้ และ Agent ของคุณเอง</p>
@@ -357,6 +363,7 @@ export default function App() {
           <TasksPage ctx={controller} />
           <KnowledgePage ctx={controller} />
           <TeamPage ctx={controller} />
+          <PersonnelPage ctx={controller} />
           <OrganizationPage ctx={controller} />
           <SettingsPage ctx={controller} />
           <TrashPage ctx={controller} />

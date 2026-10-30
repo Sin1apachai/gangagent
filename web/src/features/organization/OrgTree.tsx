@@ -35,6 +35,9 @@ export function OrgTree({
             <CharacterSprite id={a.character_id ?? 0} />
           </span>
           <b>{a.name}</b>
+          {a.selection_passed === false && (
+            <span className="selection-ribbon">ไม่ผ่านคัดเลือก</span>
+          )}
           <span>{a.role}</span>
           <small>
             {a.department || "ยังไม่ระบุฝ่าย"} ·{" "}

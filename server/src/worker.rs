@@ -24,6 +24,7 @@ struct Job {
     review_feedback: String,
     acceptance_criteria: String,
     execution_context: Option<Value>,
+    context_format: String,
 }
 #[derive(Clone, Serialize)]
 struct Provider {
@@ -428,7 +429,7 @@ async fn prepare_inputs(db: &PgPool, j: &Job, dir: &FsPath) -> WorkerResult<()> 
 async fn prompt(db: &PgPool, j: &Job) -> WorkerResult<String> {
     let notes:Vec<(String,String)>=sqlx::query_as("SELECT title,content FROM knowledge WHERE workspace_id=$1 AND verified AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20").bind(j.workspace_id).fetch_all(db).await?;
     let instructions = if let Some(context) = &j.execution_context {
-        format!("Frozen role, skills and workflow contracts (do not grant additional tools or permissions):\n{}",serde_json::to_string_pretty(context)?)
+        format!("Frozen role, skills and workflow contracts (do not grant additional tools or permissions):\n{}",if j.context_format == "pretty" { serde_json::to_string_pretty(context)? } else { crate::usage::compact_context(context) })
     } else if let Some(id) = j.agent_id {
         sqlx::query_scalar::<_,String>("SELECT instructions FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL AND provider=$3").bind(id).bind(j.workspace_id).bind(&j.provider).fetch_optional(db).await?.unwrap_or_default()
     } else {
@@ -502,6 +503,28 @@ async fn execute(
         .bind(run)
         .execute(db)
         .await?;
+    let extra = j
+        .execution_context
+        .as_ref()
+        .map(|c| {
+            serde_json::to_string_pretty(c)
+                .unwrap()
+                .len()
+                .saturating_sub(crate::usage::compact_context(c).len())
+        })
+        .unwrap_or(0);
+    let extra = if j.context_format == "pretty" {
+        0
+    } else {
+        extra
+    };
+    let metrics = json!({"source":if fixture {"fixture"} else {"pending"},"context_mode":j.context_format,"app_prompt_bytes":prompt.len(),"baseline_app_prompt_bytes":prompt.len()+extra,"saved_formatting_bytes":extra});
+    sqlx::query("UPDATE task_runs SET usage_metrics=$1 WHERE id=$2 AND task_id=$3")
+        .bind(metrics)
+        .bind(run)
+        .bind(j.id)
+        .execute(db)
+        .await?;
     if fixture {
         let start = Instant::now();
         let duration = if j.description.contains("[test:slow]") {
@@ -519,11 +542,30 @@ async fn execute(
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
+        if j.description.contains("[test:quota-once]") {
+            let previous: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM task_runs WHERE task_id=$1 AND status='waiting_quota'",
+            )
+            .bind(j.id)
+            .fetch_one(db)
+            .await?;
+            if previous == 0 {
+                let reset = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs()
+                    + 2;
+                return Ok((
+                    "waiting_quota".into(),
+                    String::new(),
+                    format!("Provider quota reached; reset_at={reset}"),
+                ));
+            }
+        }
         if j.description.contains("[test:quota]") {
             return Ok((
                 "waiting_quota".into(),
                 String::new(),
-                "Provider quota reached; manual retry required".into(),
+                "Provider quota reached; reset time unavailable; scheduled check pending".into(),
             ));
         }
         if j.description.contains("[test:fail]") {
@@ -541,6 +583,15 @@ async fn execute(
                 tokio::fs::write(source, "REVISED_FILE_CONTENT").await?;
             }
         }
+        if j.description.contains("[office:recruitment-decision]") {
+            let score = if j.description.contains("[test:reject-candidate]") {
+                30
+            } else {
+                90
+            };
+            let report = json!({"passed":score>=70,"reason":if j.description.contains("[test:invalid-selection]"){ "" }else{ "Fixture evidence-based candidate assessment" },"scores":(["role_fit","skill_evidence","collaboration"].iter().map(|id|json!({"criterion_id":id,"score":score,"reason":"Fixture trial evidence"})).collect::<Vec<_>>())});
+            tokio::fs::write(dir.join("selection.json"), serde_json::to_vec(&report)?).await?;
+        }
         let text = format!(
             "FIXTURE TEST ONLY — no AI was called.\n\n{}\n\n{}",
             j.title, prompt
@@ -553,6 +604,14 @@ async fn execute(
     } else {
         prompt.to_string()
     };
+    sqlx::query(
+        "UPDATE task_runs SET usage_metrics=usage_metrics || $1 WHERE id=$2 AND task_id=$3",
+    )
+    .bind(json!({"submitted_prompt_bytes":prompt.len()}))
+    .bind(run)
+    .bind(j.id)
+    .execute(db)
+    .await?;
     let schema_path = std::env::temp_dir().join(format!("office-schema-{run}.json"));
     if j.provider == "codex" {
         std::fs::write(&schema_path, serde_json::to_vec(&codex_files::schema())?)?;
@@ -599,6 +658,16 @@ async fn execute(
         String::from_utf8_lossy(&stdout),
         String::from_utf8_lossy(&stderr)
     );
+    let mut metrics = crate::usage::provider_usage(&j.provider, &stdout);
+    metrics["provider_elapsed_ms"] = json!(start.elapsed().as_millis() as u64);
+    sqlx::query(
+        "UPDATE task_runs SET usage_metrics=usage_metrics || $1 WHERE id=$2 AND task_id=$3",
+    )
+    .bind(metrics)
+    .bind(run)
+    .bind(j.id)
+    .execute(db)
+    .await?;
     let lower = combined.to_lowercase();
     if lower.contains("token_revoked")
         || lower.contains("invalidated oauth token")
@@ -620,7 +689,11 @@ async fn execute(
         return Ok((
             "waiting_quota".into(),
             String::new(),
-            "Provider quota reached; no paid fallback or automatic retry was attempted".into(),
+            quota::reset_hint(&combined)
+                .map(|hint| format!("Provider quota reached; reset_at={hint}"))
+                .unwrap_or_else(|| {
+                    "Provider quota reached; reset time unavailable; scheduled check pending".into()
+                }),
         ));
     }
     if !exit.success() {
@@ -747,6 +820,9 @@ async fn finish(
     let mut tx = db.begin().await?;
     let n=sqlx::query("UPDATE tasks SET status=$1,result=$2,error=$3,execution_requested=false,cancel_requested=false,lease_until=NULL,version=version+1 WHERE id=$4 AND current_run_id=$5 AND status='running'").bind(status).bind(result).bind(error).bind(j.id).bind(run).execute(&mut *tx).await?.rows_affected();
     if n > 0 {
+        if status == "waiting_quota" {
+            quota::waiting(&mut tx, j.id, error).await?;
+        }
         sqlx::query(
             "UPDATE task_runs SET status=$1,result=$2,error=$3,finished_at=now() WHERE id=$4",
         )
@@ -782,7 +858,7 @@ async fn claim(db: &PgPool, uid: Uuid) -> WorkerResult<Option<Job>> {
         return Ok(None);
     }
 
-    let j=sqlx::query_as::<_,Job>("SELECT t.id,t.workspace_id,t.title,t.description,t.provider,t.agent_id,t.review_feedback,t.acceptance_criteria,t.execution_context FROM tasks t JOIN workspaces w ON w.id=t.workspace_id JOIN users u ON u.id=t.created_by JOIN provider_connections c ON c.user_id=u.id AND c.provider=t.provider WHERE t.created_by=$1 AND t.status='queued' AND t.execution_requested AND t.deleted_at IS NULL AND w.deleted_at IS NULL AND u.deleted_at IS NULL AND c.enabled AND c.billing_acknowledged AND t.attempts<3 AND NOT EXISTS(SELECT 1 FROM task_dependencies d JOIN tasks parent ON parent.id=d.depends_on WHERE d.task_id=t.id AND (parent.status!='done' OR parent.deleted_at IS NOT NULL)) AND (t.plan_id IS NULL OR EXISTS(SELECT 1 FROM plans p WHERE p.id=t.plan_id AND p.status='approved')) AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND (u.is_super_admin OR EXISTS(SELECT 1 FROM memberships m WHERE m.workspace_id=w.id AND m.user_id=u.id AND m.role IN ('owner','member'))) ORDER BY t.created_at FOR UPDATE OF t SKIP LOCKED LIMIT 1").bind(uid).fetch_optional(&mut *tx).await?;
+    let j=sqlx::query_as::<_,Job>("SELECT t.id,t.workspace_id,t.title,t.description,t.provider,t.agent_id,t.review_feedback,t.acceptance_criteria,t.execution_context,t.context_format FROM tasks t JOIN workspaces w ON w.id=t.workspace_id JOIN users u ON u.id=t.created_by JOIN provider_connections c ON c.user_id=u.id AND c.provider=t.provider WHERE t.created_by=$1 AND t.status='queued' AND t.execution_requested AND t.deleted_at IS NULL AND w.deleted_at IS NULL AND u.deleted_at IS NULL AND c.enabled AND c.billing_acknowledged AND t.attempts<3 AND NOT EXISTS(SELECT 1 FROM task_dependencies d JOIN tasks parent ON parent.id=d.depends_on WHERE d.task_id=t.id AND (parent.status!='done' OR parent.deleted_at IS NOT NULL)) AND (t.plan_id IS NULL OR EXISTS(SELECT 1 FROM plans p WHERE p.id=t.plan_id AND p.status='approved')) AND (t.agent_id IS NULL OR EXISTS(SELECT 1 FROM agents a WHERE a.id=t.agent_id AND a.workspace_id=t.workspace_id AND a.provider=t.provider AND a.enabled AND a.deleted_at IS NULL)) AND (u.is_super_admin OR EXISTS(SELECT 1 FROM memberships m WHERE m.workspace_id=w.id AND m.user_id=u.id AND m.role IN ('owner','member'))) ORDER BY t.created_at FOR UPDATE OF t SKIP LOCKED LIMIT 1").bind(uid).fetch_optional(&mut *tx).await?;
     if let Some(ref j) = j {
         sqlx::query("UPDATE tasks SET status='running',lease_until=now()+interval '20 seconds',version=version+1 WHERE id=$1").bind(j.id).execute(&mut *tx).await?;
     }

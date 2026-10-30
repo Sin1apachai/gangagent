@@ -1,0 +1,11 @@
+CREATE TABLE master_data(category text NOT NULL,id text NOT NULL,payload jsonb NOT NULL,source_version integer NOT NULL,PRIMARY KEY(category,id));
+CREATE TABLE master_data_imports(version integer PRIMARY KEY,checksum text NOT NULL,imported_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE master_data ENABLE ROW LEVEL SECURITY;
+ALTER TABLE master_data_imports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agents ADD COLUMN birth_date text,ADD COLUMN personality jsonb,ADD COLUMN selection_passed boolean,ADD COLUMN selection_reason text NOT NULL DEFAULT '';
+CREATE TABLE recruitment_applications(id uuid PRIMARY KEY,workspace_id uuid NOT NULL REFERENCES workspaces(id),candidate_id uuid NOT NULL REFERENCES agents(id),plan_id uuid NOT NULL UNIQUE REFERENCES plans(id),role_title text NOT NULL,version integer NOT NULL DEFAULT 0,passed boolean,reason text NOT NULL DEFAULT '',scores jsonb,candidate_snapshot jsonb NOT NULL,criteria_snapshot jsonb NOT NULL,created_by uuid NOT NULL REFERENCES users(id),created_at timestamptz NOT NULL DEFAULT now(),decided_at timestamptz);
+CREATE INDEX recruitment_workspace_idx ON recruitment_applications(workspace_id,created_at DESC);
+ALTER TABLE recruitment_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ADD COLUMN quota_auto_resume boolean NOT NULL DEFAULT true,ADD COLUMN quota_reset_at timestamptz,ADD COLUMN next_quota_check_at timestamptz,ADD COLUMN quota_check_minutes integer NOT NULL DEFAULT 120 CHECK(quota_check_minutes BETWEEN 5 AND 1440),ADD COLUMN quota_retries integer NOT NULL DEFAULT 0;
+CREATE INDEX quota_due_idx ON tasks(next_quota_check_at) WHERE status='waiting_quota' AND quota_auto_resume;
+UPDATE tasks SET next_quota_check_at=now()+interval '120 minutes' WHERE status='waiting_quota' AND attempts<3 AND NOT cancel_requested AND deleted_at IS NULL;

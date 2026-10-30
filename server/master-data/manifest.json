@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "schema_version": 1,
+  "basis": "fictional_zodiac_theme",
+  "description": "ชุดบุคลิกตัวละคร AI สมมติ ใช้ราศีเป็นธีม ไม่ใช่ลัคนาหรือเกณฑ์ตัดสินบุคคลจริง",
+  "files": [
+    "zodiac-signs.json",
+    "personality-traits.json",
+    "zodiac-personality-rules.json",
+    "recruitment-criteria.json"
+  ]
+}

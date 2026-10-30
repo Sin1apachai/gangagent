@@ -20,7 +20,7 @@ pub(crate) async fn freeze_context(
 ) -> Result<Value> {
     let mut context = json!({"schema":1,"agent":null,"skills":[],"workflow":contract});
     if let Some(id) = agent {
-        let row:Option<Value>=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'role',role,'instructions',instructions,'department',department,'responsibilities',responsibilities,'decision_scope',decision_scope,'manager_id',manager_id,'agent_version',version) FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL").bind(id).bind(wid).fetch_optional(&mut **tx).await?;
+        let row:Option<Value>=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'role',role,'instructions',instructions,'department',department,'responsibilities',responsibilities,'decision_scope',decision_scope,'manager_id',manager_id,'agent_version',version,'birth_date',birth_date,'personality',personality) FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL").bind(id).bind(wid).fetch_optional(&mut **tx).await?;
         context["agent"] = row.ok_or(bad("Agent unavailable"))?;
         let all: i64 = sqlx::query_scalar("SELECT count(*) FROM agent_skills WHERE agent_id=$1")
             .bind(id)

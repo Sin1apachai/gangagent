@@ -1,3 +1,6 @@
+import { PersonnelNavigation } from "../personnel/PersonnelNavigation";
+import { SelectionRibbon } from "../personnel/AgentPersonality";
+import "../personnel/personnel.css";
 import { CharacterSprite } from "../office/CharacterPicker";
 import React from "react";
 import type {
@@ -82,6 +85,7 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
   if (!user) return null;
   return (
     <>
+      {page === "team" && <PersonnelNavigation ctx={ctx} />}
       {page === "team" && data && (
         <>
           <div className="section-toolbar">
@@ -113,6 +117,13 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
                   <span className="eyebrow">{a.provider.toUpperCase()}</span>
                   <h2>{a.name}</h2>
                   <p>{a.role}</p>
+                  <SelectionRibbon agent={a} />
+                  {a.personality && (
+                    <p className="muted">
+                      {a.personality.zodiac_name} ·{" "}
+                      {a.personality.traits.map((t) => t.name).join(" / ")}
+                    </p>
+                  )}
                   <span className="tag">
                     {!a.enabled
                       ? "ปิดใช้งาน"
@@ -121,7 +132,13 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
                               t.agent_id === a.id && t.status === "running",
                           )
                         ? "กำลังทำงาน"
-                        : "ว่าง"}
+                        : data.tasks.some(
+                              (t) =>
+                                t.agent_id === a.id &&
+                                t.status === "waiting_quota",
+                            )
+                          ? "รอรีเซ็ต"
+                          : "ว่าง"}
                   </span>
                   <p className="agent-instructions">
                     {a.instructions || "ยังไม่มีคำสั่งประจำตัว"}

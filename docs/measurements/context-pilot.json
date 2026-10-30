@@ -1,0 +1,90 @@
+{
+  "workspace": "10bb537c-e480-4ccc-afcb-3fc49acf4bae",
+  "archived": true,
+  "rows": [
+    {
+      "provider": "codex",
+      "mode": "pretty",
+      "passed": true,
+      "attempts": 1,
+      "task_id": "49f6dc9f-06b9-45e2-b3b8-5588c56d3b9f",
+      "usage": {
+        "app_prompt_bytes": 4744,
+        "baseline_app_prompt_bytes": 4744,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": null,
+        "context_mode": "pretty",
+        "input_semantics": "input includes cached input",
+        "input_tokens": 12220,
+        "output_tokens": 56,
+        "provider_elapsed_ms": 8836,
+        "saved_formatting_bytes": 0,
+        "source": "provider",
+        "submitted_prompt_bytes": 5357
+      }
+    },
+    {
+      "provider": "codex",
+      "mode": "compact",
+      "passed": true,
+      "attempts": 1,
+      "task_id": "e0b1d12d-4211-45f2-b551-493ac46fea36",
+      "usage": {
+        "app_prompt_bytes": 4061,
+        "baseline_app_prompt_bytes": 4744,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": null,
+        "context_mode": "compact",
+        "input_semantics": "input includes cached input",
+        "input_tokens": 12013,
+        "output_tokens": 56,
+        "provider_elapsed_ms": 6357,
+        "saved_formatting_bytes": 683,
+        "source": "provider",
+        "submitted_prompt_bytes": 4674
+      }
+    },
+    {
+      "provider": "claude",
+      "mode": "compact",
+      "passed": true,
+      "attempts": 1,
+      "task_id": "572ef5c6-24ef-44df-bcb4-bc1e14b4adf7",
+      "usage": {
+        "app_prompt_bytes": 4106,
+        "baseline_app_prompt_bytes": 4789,
+        "cache_read_tokens": 10033,
+        "cache_write_tokens": 3092,
+        "context_mode": "compact",
+        "input_semantics": "uncached; cache read/write reported separately",
+        "input_tokens": 4,
+        "output_tokens": 191,
+        "provider_elapsed_ms": 11046,
+        "saved_formatting_bytes": 683,
+        "source": "provider",
+        "submitted_prompt_bytes": 4106
+      }
+    },
+    {
+      "provider": "claude",
+      "mode": "pretty",
+      "passed": true,
+      "attempts": 1,
+      "task_id": "7df8a79f-2237-4640-b004-8f400ee46034",
+      "usage": {
+        "app_prompt_bytes": 4789,
+        "baseline_app_prompt_bytes": 4789,
+        "cache_read_tokens": 11002,
+        "cache_write_tokens": 2588,
+        "context_mode": "pretty",
+        "input_semantics": "uncached; cache read/write reported separately",
+        "input_tokens": 4,
+        "output_tokens": 164,
+        "provider_elapsed_ms": 3446,
+        "saved_formatting_bytes": 0,
+        "source": "provider",
+        "submitted_prompt_bytes": 4789
+      }
+    }
+  ]
+}

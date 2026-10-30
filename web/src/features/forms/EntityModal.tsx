@@ -1,3 +1,4 @@
+import { AgentPersonality } from "../personnel/AgentPersonality";
 import React, { useState, useEffect } from "react";
 import { FormTabs } from "../../shared/FormTabs";
 import { CharacterPicker } from "../office/CharacterPicker";
@@ -106,9 +107,11 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                 const target = e.target as HTMLInputElement;
                 const name = target.name;
                 setAgentTab(
-                  ["x", "y", "instructions"].includes(name)
-                    ? "instructions"
-                    : "profile",
+                  name === "birth_date"
+                    ? "personality"
+                    : ["x", "y", "instructions"].includes(name)
+                      ? "instructions"
+                      : "profile",
                 );
                 requestAnimationFrame(() => target.focus());
               }
@@ -371,6 +374,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                       tabs={[
                         { id: "profile", label: "ข้อมูลทั่วไป" },
                         { id: "appearance", label: "ตัวละคร" },
+                        { id: "personality", label: "วันเกิดและบุคลิก" },
                         { id: "instructions", label: "คำสั่งและตำแหน่ง" },
                       ]}
                     />
@@ -411,6 +415,19 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                         />
                         เปิดใช้งาน Agent
                       </label>
+                    </div>
+                    <div
+                      role="tabpanel"
+                      aria-label="วันเกิดและบุคลิก"
+                      hidden={agentTab !== "personality"}
+                    >
+                      <Field
+                        label="วันเกิด Agent"
+                        name="birth_date"
+                        type="date"
+                        value={modal.value?.birth_date ?? ""}
+                      />
+                      <AgentPersonality agent={modal.value} />
                     </div>
                     <div
                       role="tabpanel"
