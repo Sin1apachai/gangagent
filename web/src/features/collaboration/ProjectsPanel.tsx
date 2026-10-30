@@ -3,9 +3,7 @@ import { api } from "../../shared/api";
 import { FormTabs } from "../../shared/FormTabs";
 import type { OfficeController } from "../../application/useOfficeController";
 import "./projects.css";
-import { ProjectFolderPicker, type ProjectFolder } from "./ProjectFolderPicker";
 export type Project = {
-  working_folder?: ProjectFolder | null;
   id: string;
   name: string;
   description: string;
@@ -13,8 +11,6 @@ export type Project = {
   deleted_at: string | null;
 };
 type Draft = {
-  working_folder: ProjectFolder | null;
-  originalFolder: ProjectFolder | null;
   id?: string;
   name: string;
   description: string;
@@ -35,8 +31,6 @@ export function ProjectsPanel({
     [draft, setDraft] = useState<Draft | null>(null),
     [confirm, setConfirm] = useState<Project | null>(null),
     [saving, setSaving] = useState(false),
-    [pickingFolder, setPickingFolder] = useState(false),
-    [editorTab, setEditorTab] = useState("details"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [created, setCreated] = useState("");
@@ -49,19 +43,15 @@ export function ProjectsPanel({
       setNotice("");
     }
   }, [created, ctx.data?.tasks]);
-  const disabled = saving || pickingFolder || ctx.busy;
+  const disabled = saving || ctx.busy;
   const changed =
     !!draft &&
     (draft.name !== draft.originalName ||
-      draft.description !== draft.originalDescription ||
-      draft.working_folder?.id !== draft.originalFolder?.id);
+      draft.description !== draft.originalDescription);
   function open(p?: Project) {
-    setEditorTab("details");
     setError("");
     setNotice("");
     setDraft({
-      working_folder: p?.working_folder ?? null,
-      originalFolder: p?.working_folder ?? null,
       id: p?.id,
       name: p?.name ?? "",
       description: p?.description ?? "",
@@ -94,7 +84,6 @@ export function ProjectsPanel({
           name: draft.name.trim(),
           description: draft.description,
           version: draft.version,
-          working_folder: draft.working_folder ?? {},
         },
         draft.id ? "PUT" : "POST",
       );
@@ -230,9 +219,6 @@ export function ProjectsPanel({
                 {p.description ||
                   "ยังไม่มีรายละเอียด เพิ่มได้ภายหลังจากปุ่มแก้ไข"}
               </p>
-              {p.working_folder && (
-                <p className="project-folder-path">{p.working_folder.path}</p>
-              )}
               <div className="project-task-count">
                 {tasks.length
                   ? `${tasks.length} งานทั้งหมด · เสร็จแล้ว ${done} งาน`
@@ -305,7 +291,7 @@ export function ProjectsPanel({
             aria-label={draft.id ? "แก้ไขโปรเจกต์" : "สร้างโปรเจกต์"}
             onSubmit={save}
             onKeyDown={(e) => {
-              if (e.key === "Escape" && !saving && !pickingFolder) {
+              if (e.key === "Escape" && !saving) {
                 e.preventDefault();
                 setDraft(null);
                 setError("");
@@ -316,7 +302,7 @@ export function ProjectsPanel({
               type="button"
               className="close"
               aria-label="ปิดฟอร์มโปรเจกต์"
-              disabled={saving || pickingFolder}
+              disabled={saving}
               onClick={() => {
                 setDraft(null);
                 setError("");
@@ -331,67 +317,32 @@ export function ProjectsPanel({
                 ? "แก้ข้อมูลที่ต้องการ แล้วกดบันทึกการแก้ไข"
                 : "กรอกชื่อโปรเจกต์ก่อน รายละเอียดเพิ่มเติมใส่ภายหลังได้"}
             </p>
-            <FormTabs
-              label="Project settings"
-              value={editorTab}
-              onChange={(tab) => {
-                if (!pickingFolder) setEditorTab(tab);
-              }}
-              tabs={[
-                { id: "details", label: "รายละเอียด" },
-                {
-                  id: "folder",
-                  label: "โฟลเดอร์ทำงาน" + (draft.working_folder ? " ✓" : ""),
-                },
-              ]}
-            />
-            <div className="project-form-fields" role="tabpanel">
-              {editorTab === "details" && (
-                <>
-                  <label>
-                    ชื่อโปรเจกต์
-                    <input
-                      autoFocus
-                      required
-                      name="name"
-                      maxLength={100}
-                      value={draft.name}
-                      onChange={(e) =>
-                        setDraft({ ...draft, name: e.target.value })
-                      }
-                      placeholder="เช่น เว็บไซต์บริษัท Tech"
-                    />
-                  </label>
-                  <label>
-                    เป้าหมายและรายละเอียด (ไม่บังคับ)
-                    <textarea
-                      name="description"
-                      rows={5}
-                      maxLength={5000}
-                      value={draft.description}
-                      onChange={(e) =>
-                        setDraft({ ...draft, description: e.target.value })
-                      }
-                      placeholder="โปรเจกต์นี้ต้องการทำอะไร และถือว่าสำเร็จเมื่อใด"
-                    />
-                  </label>
-                </>
-              )}
-              {editorTab === "folder" && (
-                <ProjectFolderPicker
-                  wid={ctx.wid!}
-                  value={draft.working_folder}
-                  onChange={(folder) =>
-                    setDraft((current) =>
-                      current
-                        ? { ...current, working_folder: folder }
-                        : current,
-                    )
-                  }
-                  onBusy={setPickingFolder}
-                  disabled={saving}
+            <div className="project-form-fields">
+              <label>
+                ชื่อโปรเจกต์
+                <input
+                  autoFocus
+                  required
+                  name="name"
+                  maxLength={100}
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  placeholder="เช่น เว็บไซต์บริษัท Tech"
                 />
-              )}
+              </label>
+              <label>
+                เป้าหมายและรายละเอียด (ไม่บังคับ)
+                <textarea
+                  name="description"
+                  rows={5}
+                  maxLength={5000}
+                  value={draft.description}
+                  onChange={(e) =>
+                    setDraft({ ...draft, description: e.target.value })
+                  }
+                  placeholder="โปรเจกต์นี้ต้องการทำอะไร และถือว่าสำเร็จเมื่อใด"
+                />
+              </label>
             </div>
             {error && (
               <p className="error" role="alert">
@@ -401,7 +352,7 @@ export function ProjectsPanel({
             <div className="project-editor-actions">
               <button
                 type="button"
-                disabled={saving || pickingFolder}
+                disabled={saving}
                 onClick={() => {
                   setDraft(null);
                   setError("");
@@ -443,7 +394,7 @@ export function ProjectsPanel({
             )}
             <div className="project-editor-actions">
               <button
-                disabled={saving || pickingFolder}
+                disabled={saving}
                 onClick={() => {
                   setConfirm(null);
                   setError("");

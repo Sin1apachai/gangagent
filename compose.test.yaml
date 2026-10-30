@@ -6,8 +6,6 @@ services:
     environment:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
       EMBEDDING_ADDR: ""
-      PROJECT_BRIDGE_ADDR: project-bridge:18089
-      PROJECT_BRIDGE_TOKEN: fixture-project-bridge-token-12345
     restart: "no"
   backup:
     environment:
@@ -31,8 +29,6 @@ services:
     build: !reset null
     environment:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
-      PROJECT_BRIDGE_ADDR: project-bridge:18089
-      PROJECT_BRIDGE_TOKEN: fixture-project-bridge-token-12345
       WORKER_MODE: fixture
       ALLOW_TEST_WORKER: "1"
     volumes: !override [runs-data:/data]
@@ -42,7 +38,6 @@ services:
       backup: {condition: service_started}
       worker: {condition: service_started}
       worker-two: {condition: service_started}
-      project-bridge: {condition: service_started}
   worker-two:
     image: agent-office-local:latest
     user: "0:0"
@@ -51,23 +46,10 @@ services:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
       OWNER_EMAIL: ${OWNER_EMAIL}
       WORKER_ID: test-worker-two
-      PROJECT_BRIDGE_ADDR: project-bridge:18089
-      PROJECT_BRIDGE_TOKEN: fixture-project-bridge-token-12345
       WORKER_MODE: fixture
       ALLOW_TEST_WORKER: "1"
     volumes: [runs-data:/data]
     depends_on:
       app: {condition: service_started}
       postgres: {condition: service_healthy}
-    restart: "no"
-
-  project-bridge:
-    image: python:3.13-alpine
-    command: [python, /tools/project_bridge.py]
-    environment:
-      OFFICE_BRIDGE_FIXTURE: "1"
-      ALLOW_TEST_WORKER: "1"
-      PROJECT_BRIDGE_TOKEN: fixture-project-bridge-token-12345
-      OFFICE_BRIDGE_STATE: /tmp/bridge-test
-    volumes: [./tools:/tools:ro]
     restart: "no"

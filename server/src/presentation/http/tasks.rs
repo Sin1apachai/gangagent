@@ -116,8 +116,7 @@ pub(crate) async fn run_task(
                 .fetch_one(&mut *tx)
                 .await?;
         if context.is_none() {
-            let mut context = organization::freeze_context(&mut tx, wid, agent, &[], None).await?;
-            project_files::freeze(&mut tx, wid, id, u.id, &mut context).await?;
+            let context = organization::freeze_context(&mut tx, wid, agent, &[], None).await?;
             sqlx::query("UPDATE tasks SET execution_context=$1 WHERE id=$2")
                 .bind(context)
                 .bind(id)

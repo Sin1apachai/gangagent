@@ -22,6 +22,3 @@ __pycache__/
 *.log
 .pytest_cache/
 docs/screenshots/
-
-# Private local project bridge registry and authentication
-.local/
