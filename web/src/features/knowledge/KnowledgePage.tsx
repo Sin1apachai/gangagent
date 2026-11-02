@@ -1,3 +1,4 @@
+import { KnowledgeHistory } from "./KnowledgeHistory";
 import { KnowledgeSearch } from "./KnowledgeSearch";
 import React from "react";
 import type {
@@ -127,6 +128,7 @@ export function KnowledgePage({ ctx }: { ctx: OfficeController }) {
                       </p>
                     </details>
                   )}
+                  <KnowledgeHistory wid={wid!} id={k.id} version={k.version} />
                   {canWrite && (
                     <div className="actions">
                       <button

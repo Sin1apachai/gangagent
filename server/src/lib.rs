@@ -6,6 +6,7 @@ mod collaboration;
 mod context_engine;
 mod domain;
 mod infrastructure;
+mod knowledge_memory;
 mod master_data;
 mod model_selection;
 mod monitoring;
@@ -154,6 +155,7 @@ pub async fn run() {
                 .merge(organization::routes())
                 .merge(model_selection::routes())
                 .merge(master_data::routes())
+                .merge(knowledge_memory::routes())
                 .merge(recruitment::routes())
                 .merge(quota::routes())
                 .merge(context_engine::routes())

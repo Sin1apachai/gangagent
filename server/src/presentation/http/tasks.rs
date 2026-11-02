@@ -159,6 +159,7 @@ pub(crate) async fn review_task(
         return Err(bad("Feedback is required for revisions (max 10000 bytes)"));
     }
     let mut tx = a.db.begin().await?;
+    organization::lock_workspace(&mut tx, wid).await?;
     let assigned:Option<Option<Uuid>>=sqlx::query_scalar("SELECT reviewer_id FROM tasks WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL FOR UPDATE").bind(id).bind(wid).fetch_optional(&mut *tx).await?;
     if let Some(Some(reviewer)) = assigned {
         if reviewer != u.id && !u.is_super_admin {
@@ -172,6 +173,11 @@ pub(crate) async fn review_task(
         }
     }
     let n=sqlx::query("UPDATE tasks SET status=$1,review_feedback=$2,execution_requested=false,version=version+1 WHERE workspace_id=$3 AND id=$4 AND status='review' AND deleted_at IS NULL AND ($1='done' OR attempts<3)").bind(if b.accept{"done"}else{"queued"}).bind(&b.feedback).bind(wid).bind(id).execute(&mut *tx).await?.rows_affected();
+    let knowledge = if n > 0 && b.accept {
+        Some(crate::knowledge_memory::save(&mut tx, wid, id, u.id).await?)
+    } else {
+        None
+    };
     tx.commit().await?;
     if n > 0 {
         audit(&a, &u, Some(wid), "task.reviewed").await?;
@@ -189,7 +195,10 @@ pub(crate) async fn review_task(
         )
         .await?;
     }
-    changed(n)
+    if n == 0 {
+        return changed(n);
+    }
+    Ok(Json(json!({"ok":true,"knowledge":knowledge})))
 }
 pub(crate) async fn event(
     db: &PgPool,

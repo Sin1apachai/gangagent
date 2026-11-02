@@ -230,22 +230,31 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 <>
                   <h3>ผลงานล่าสุด</h3>
                   <pre className="result">{detail.task.result}</pre>
-                  <button
-                    disabled={!canWrite}
-                    onClick={() => {
-                      setModal({
-                        kind: "knowledge",
-                        value: {
-                          title: "บทเรียน: " + detail.task.title,
-                          content: detail.task.result,
-                          source: "งาน " + detail.task.id,
-                        },
-                      });
-                      setDetail(null);
-                    }}
-                  >
-                    บันทึกเป็นความรู้เพื่อตรวจสอบ
-                  </button>
+                  <p className="hint">
+                    เมื่อตรวจรับ ระบบจะบันทึก Knowledge
+                    ที่ตรวจสอบแล้วให้โดยอัตโนมัติ และเก็บประวัติก่อนอัปเดต
+                  </p>
+                  {detail.task.status === "done" && canWrite && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        run(async () => {
+                          const saved = await api<{ action: string }>(
+                            `/workspaces/${wid}/tasks/${detail.task.id}/knowledge`,
+                            {},
+                          );
+                          await after();
+                          setMessage(
+                            saved.action === "unchanged"
+                              ? "Knowledge เป็นข้อมูลล่าสุดแล้ว"
+                              : "บันทึก Knowledge จากงานที่ตรวจรับแล้ว",
+                          );
+                        })
+                      }
+                    >
+                      ซิงก์ Knowledge จากงานนี้
+                    </button>
+                  )}
                 </>
               )}
               {detail.artifacts.some(
@@ -281,11 +290,21 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                         new FormData(e.currentTarget).get("feedback") ?? "",
                       );
                       run(async () => {
-                        await api(
+                        const result = await api<{
+                          knowledge?: { action: string };
+                        }>(
                           `/workspaces/${wid}/tasks/${detail.task.id}/review`,
                           { accept, feedback },
                         );
                         await after();
+                        if (accept)
+                          setMessage(
+                            result.knowledge?.action === "updated"
+                              ? "ตรวจรับแล้ว · อัปเดต Knowledge และเก็บประวัติเดิมแล้ว"
+                              : result.knowledge?.action === "unchanged"
+                                ? "ตรวจรับแล้ว · Knowledge เป็นข้อมูลล่าสุดแล้ว"
+                                : "ตรวจรับแล้ว · สร้าง Knowledge ให้เรียบร้อยแล้ว",
+                          );
                       });
                     }}
                   >
@@ -299,7 +318,7 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                         value="accept"
                         disabled={busy}
                       >
-                        ตรวจรับงาน
+                        ตรวจรับและบันทึก Knowledge
                       </button>
                       <button
                         value="revise"

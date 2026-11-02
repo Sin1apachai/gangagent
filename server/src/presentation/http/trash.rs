@@ -29,6 +29,12 @@ pub(crate) async fn trash_entity(
     let sql=format!("UPDATE {table} SET deleted_at={state},version=version+1{reset} WHERE id=$1 AND workspace_id=$2 AND deleted_at {filter}{extra}");
     let mut tx = a.db.begin().await?;
     organization::lock_workspace(&mut tx, wid).await?;
+    if kind == "knowledge" && restore {
+        let conflict:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM knowledge archived JOIN knowledge live ON live.workspace_id=archived.workspace_id AND live.auto_key=archived.auto_key AND live.deleted_at IS NULL WHERE archived.id=$1 AND archived.workspace_id=$2 AND archived.deleted_at IS NOT NULL)").bind(id).bind(wid).fetch_one(&mut *tx).await?;
+        if conflict {
+            return Err(Error(StatusCode::CONFLICT, "A newer automatic Knowledge entry exists; review the active entry before restoring this version"));
+        }
+    }
     let n = sqlx::query(&sql)
         .bind(id)
         .bind(wid)

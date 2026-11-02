@@ -679,6 +679,21 @@ async fn execute(
                 tokio::fs::write(source, "REVISED_FILE_CONTENT").await?;
             }
         }
+        if j.description.contains("[test:knowledge-doc]") {
+            tokio::fs::write(
+                dir.join("requirements.md"),
+                if j.description.contains("[test:knowledge-v2]") {
+                    "# Requirements
+
+APPROVED_VERSION_TWO"
+                } else {
+                    "# Requirements
+
+APPROVED_VERSION_ONE"
+                },
+            )
+            .await?;
+        }
         if j.description.contains("[test:handoff") {
             tokio::fs::write(dir.join("proof.txt"), "ACCEPTED_PROOF").await?;
             let brief = json!({"summary":"Accepted fixture evidence","decisions":["Evidence retained"],"open_questions":[],"artifacts":[if j.description.contains("[test:handoff-invalid]"){ "missing.txt" }else{ "proof.txt" }]});
