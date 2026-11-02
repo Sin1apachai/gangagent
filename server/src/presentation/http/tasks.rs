@@ -183,6 +183,11 @@ pub(crate) async fn review_task(
     let mut tx = a.db.begin().await?;
     organization::lock_workspace(&mut tx, wid).await?;
     if b.accept {
+        let code_pending:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tasks t JOIN task_runs r ON r.id=t.current_run_id WHERE t.id=$1 AND t.workspace_id=$2 AND (r.usage_metrics ? 'project_code_request' OR (r.usage_metrics->>'project_code_state'='unavailable' AND EXISTS(SELECT 1 FROM artifacts a WHERE a.run_id=r.id AND a.name LIKE 'code/%'))) AND (r.usage_metrics->>'project_code_state' IS DISTINCT FROM 'synced' OR coalesce((r.usage_metrics->>'project_code_closed')::boolean,false)=false))").bind(id).bind(wid).fetch_one(&a.db).await?;
+        if code_pending {
+            return Err(Error(StatusCode::CONFLICT,"Project code is not synchronized; inspect the code status or resolve its conflict first"));
+        }
+
         let blocked:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tasks t WHERE t.id=$1 AND t.workspace_id=$2 AND t.runtime_enabled AND NOT EXISTS(SELECT 1 FROM runtime_jobs r WHERE r.task_id=t.id AND r.source_run_id=t.current_run_id AND r.status='ready' AND r.evidence->>'tests_passed'='true' AND r.evidence->>'http_passed'='true'))").bind(id).bind(wid).fetch_one(&mut *tx).await?;
         if blocked {
             return Err(Error(

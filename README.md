@@ -593,7 +593,7 @@ Skill ที่ผูกกับ Agent ยังคงถูกส่งเข�
 
 เมื่อสถานะ **พร้อมเปิดเว็บ** ให้กด **เปิดเว็บบนเครื่องนี้** ระบบแสดง URL เฉพาะ Preview เช่น `http://preview-<id>.localhost:19000` พร้อมหลักฐานของ source run ที่ทดสอบจริง มีปุ่มหยุดและประวัติ Log แยกจาก Log ของ Agent; Preview หยุดอัตโนมัติในสองชั่วโมง การผ่าน HTTP ยืนยันว่าเปิดเว็บได้ ไม่ใช่การรับรองฟังก์ชันธุรกิจทั้งหมด ผู้ใช้ยังตรวจรับผลงานสุดท้ายได้ตาม Workflow
 
-มาตรฐานกลางอยู่ที่ **Knowledge → มาตรฐานกลางสำหรับ Agent** นำเข้าจากไฟล์ [application-runtime-v1.md](server/standards/application-runtime-v1.md) เมื่อระบบเริ่ม และแนบในบริบทงานใหม่ทุก Workspace/ทั้ง Codex และ Claude งานเก่าที่ไม่มีมาตรฐานจะได้รับผ่าน prompt สำรอง Agent ต้องส่ง source จริง, `office-run.json`, `package.json`, `package-lock.json` และชุดทดสอบ เมื่อแก้งานหรือ retry ระบบแนบผล Runner รอบก่อนให้ผู้สร้างงาน และผู้ตรวจที่เป็น Agent ต้องมีหลักฐานพร้อมใช้งานตรง source run ก่อนผ่านงานที่เปิด Runner
+มาตรฐานกลางอยู่ที่ **Knowledge → มาตรฐานกลางสำหรับ Agent** นำเข้าจากไฟล์ [application-runtime-v2.md](server/standards/application-runtime-v2.md) เมื่อระบบเริ่ม และแนบในบริบทงานใหม่ทุก Workspace/ทั้ง Codex และ Claude งานเก่าที่ไม่มีมาตรฐานจะได้รับผ่าน prompt สำรอง Agent ต้องส่ง source จริง, `office-run.json`, `package.json`, `package-lock.json` และชุดทดสอบ เมื่อแก้งานหรือ retry ระบบแนบผล Runner รอบก่อนให้ผู้สร้างงาน และผู้ตรวจที่เป็น Agent ต้องมีหลักฐานพร้อมใช้งานตรง source run ก่อนผ่านงานที่เปิด Runner
 
 **ขอบเขตรุ่นแรก:** Node.js รวมถึง React ที่ build เป็น production assets และให้ Node serve ไฟล์; ยังไม่รัน Compose ที่ Agent เขียนเองหรือรองรับฐานข้อมูลของโปรแกรมลูก/ทุกภาษาโดยอัตโนมัติ Server ต้องฟัง `0.0.0.0:process.env.PORT` (Runner กำหนด 3000) ตัวอย่างไฟล์ครบอยู่ใน [runtime-node](server/fixtures/runtime-node) ไฟล์ตัวอย่างนี้ใช้ทดสอบ ไม่สร้างข้อมูลตัวอย่างลง Workspace ใช้งานจริง
 
@@ -609,12 +609,12 @@ Runner เป็นบริการแยกที่ควบคุม Docker
 ผลทดสอบและข้อจำกัด: [Managed Runner verification](docs/runtime-runner-verification.md) ชุด API ปกติใช้ `./test.sh` และไม่เปิด Runner ส่วน `tests/probe_runtime_runner.py` เป็นการทดสอบ Docker จริงที่ต้องเลือกใช้โดยตั้งใจ โดยตรวจชื่อ project `agent-office-runtime-preview`, ฐานข้อมูล `office_test`, Worker แบบ fixture และการไม่มี volume บัญชี AI ก่อนเริ่ม ไม่ชี้ไปยังระบบใช้งานจริง
 
 
-### โฟลเดอร์โค้ดแยกตาม Workspace
+### โค้ดโปรแกรมแยกตาม Workspace และ Project
 
-Workspace **ONE** จะมีโฟลเดอร์ `workspace/one` ใต้โฟลเดอร์ Agent Office เช่น `/Users/hall/Desktop/agent office/workspace/one` เมื่อ Agent ส่งไฟล์เสร็จ ระบบส่งออกชุดโค้ด/ผลงานไปที่ `workspace/one/tasks/<task-id>/runs/<run-id>/` โดยแยกงานและรอบ ไม่ทับไฟล์เก่า ดูพาธและสถานะได้ที่ **รายละเอียดงาน → ไฟล์ผลงาน → โฟลเดอร์โค้ดบนเครื่อง**
+โค้ดอยู่เป็นชุดเดียวที่ `workspace/<workspace>/<project>/` เช่น `/Users/hall/Desktop/agent office/workspace/one/purchase/` หากไม่ได้เลือก Project จะใช้ `workspace/one/app/` งานถัดไปอ่านโค้ดเดิมและแก้ชุดเดิมต่อ รวมถึงโค้ดที่แก้บนเครื่อง ไม่สร้างชุดโค้ดใหม่ตาม Task หรือ Run
 
-ชื่อ Workspace ซ้ำสร้างหรือเปลี่ยนชื่อไม่ได้ รวมถึงตัวพิมพ์เล็ก/ใหญ่ ช่องว่างหัวท้าย และ Unicode ที่เทียบเท่ากัน ชื่อที่ชนโฟลเดอร์เดียวกันก็ถูกกันไว้ ชื่อในถังขยะยังถูกจอง ส่วนการเปลี่ยนชื่อแสดงผลจะไม่ย้ายโฟลเดอร์เดิม
+Agent เขียนโปรแกรมใน working view `code/` ซึ่งระบบซิงก์กับโปรเจกต์ ส่วนข้อมูล Task สถานะ และ Log อยู่ใน PostgreSQL รายงานของ Task ไม่ถูกส่งออกไปปะปนกับโค้ด ดูพาธและสถานะได้ใน **รายละเอียดงาน → ไฟล์ผลงาน → ชุดโค้ดโปรเจกต์บนเครื่อง** เมื่อมีการแก้ไฟล์ชนกันระบบเก็บการแก้ของอีกฝ่ายไว้และแจ้ง conflict ก่อนตรวจรับ
 
-เป็นการส่งออกหลังจบงาน ไม่ใช่ sync สองทาง การแก้โค้ดบนเครื่องไม่เปลี่ยนผลงานหรือผลตรวจของรอบเดิม หากต้องเก็บส่วนที่แก้เอง ให้สำรอง `workspace/` ด้วย รัน `./setup.sh` ตอนอัปเกรดเพื่อเตรียมสิทธิ์ไฟล์ โดยไม่เปลี่ยนบัญชีเดิม
+ชื่อ Workspace ซ้ำสร้างหรือเปลี่ยนไม่ได้ รวมตัวพิมพ์เล็ก/ใหญ่ ช่องว่างหัวท้าย Unicode ที่เทียบเท่ากัน และชื่อในถังขยะ โฟลเดอร์คงชื่อตอนสร้างเพื่อให้พาธเสถียร รัน `./setup.sh` เมื่ออัปเกรดเพื่อเตรียมสิทธิ์ไฟล์โดยไม่เปลี่ยนบัญชีเดิม
 
-[รายละเอียด ขอบเขต และการทดสอบ](docs/workspace-code-folders.md)
+[รายละเอียดการแยกโค้ดกับ Task](docs/workspace-code-folders.md)

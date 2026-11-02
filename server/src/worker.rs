@@ -316,11 +316,14 @@ async fn restore_revision_files(db: &PgPool, j: &Job, dir: &FsPath) -> WorkerRes
         if total > 50 * 1024 * 1024 {
             return Err("Revision artifacts exceed limit".into());
         }
+        if name.starts_with("code/") && dir.join("code").is_dir() {
+            continue;
+        }
         copy_revision_file(&root, dir, name, *size as u64)?;
     }
     Ok(files.len())
 }
-fn copy_revision_file(
+pub(crate) fn copy_revision_file(
     root: &FsPath,
     destination: &FsPath,
     name: &str,
@@ -633,7 +636,9 @@ async fn execute(
     if fixture {
         if j.description.contains("[test:node-preview]") {
             let nested = j.description.contains("[test:runtime-nested]");
-            let target = if nested {
+            let target = if j.description.contains("[test:project-code]") {
+                dir.join("code")
+            } else if nested {
                 let p = dir.join("web");
                 tokio::fs::create_dir_all(&p).await?;
                 p
@@ -666,7 +671,11 @@ async fn execute(
                     include_str!("../fixtures/runtime-node/build.mjs"),
                 ),
             ] {
-                tokio::fs::write(target.join(name), text).await?;
+                if !(j.description.contains("[test:project-observe]")
+                    && target.join(name).is_file())
+                {
+                    tokio::fs::write(target.join(name), text).await?;
+                }
             }
             let mut manifest: Value =
                 serde_json::from_str(include_str!("../fixtures/runtime-node/office-run.json"))?;
@@ -685,7 +694,20 @@ async fn execute(
             if j.description.contains("[test:runtime-test-fail]") {
                 tokio::fs::write(target.join("test.mjs"), "process.exit(1)").await?;
             }
-            tokio::fs::write(dir.join("office-run.json"), serde_json::to_vec(&manifest)?).await?;
+            tokio::fs::write(
+                target.join("office-run.json"),
+                serde_json::to_vec(&manifest)?,
+            )
+            .await?;
+        }
+        if j.description.contains("[test:project-conflict]") {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::fs::write(
+                dir.join("code/server.mjs"),
+                "Agent changed this file after preparation",
+            )
+            .await?;
+            tokio::time::sleep(Duration::from_secs(2)).await;
         }
         if j.description.contains("[test:many-events]") {
             for i in 0..45 {
@@ -989,8 +1011,22 @@ fn collect_files(
     if depth > 8 || out.len() >= 100 {
         return Ok(());
     }
-    for entry in std::fs::read_dir(dir)? {
-        let e = entry?;
+    let mut entries = std::fs::read_dir(dir)?.collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(|e| {
+        let name = e.file_name();
+        let name = name.to_string_lossy();
+        (
+            if dir == root && name == "code" {
+                0
+            } else if dir == root && matches!(name.as_ref(), "inputs" | "references") {
+                2
+            } else {
+                1
+            },
+            e.path(),
+        )
+    });
+    for e in entries {
         let m = e.path().symlink_metadata()?;
         if m.file_type().is_symlink() {
             continue;
@@ -1030,7 +1066,11 @@ async fn finish(
         .flatten()
         .filter_map(Value::as_str)
         .filter(|name| {
-            let mut path = dir.to_path_buf();
+            let mut path = if !dir.join(name).is_file() && dir.join("code").join(name).is_file() {
+                dir.join("code")
+            } else {
+                dir.to_path_buf()
+            };
             for component in FsPath::new(name).components() {
                 path.push(component);
                 if path
@@ -1210,9 +1250,30 @@ pub async fn run_worker() -> WorkerResult<()> {
                         .into(),
                 )
             } else {
-                let prepared = match restore_revision_files(&db, &j, &dir).await {
-                    Ok(count) => prepare_inputs(&db, &j, &dir).await.map(|_| count),
-                    Err(e) => Err(e),
+                if !fixture && !std::path::Path::new("/project-work").is_dir() {
+                    sqlx::query("UPDATE task_runs SET usage_metrics=usage_metrics||'{\"project_code_state\":\"unavailable\",\"project_code_error\":\"Worker has no authorized project code channel\"}'::jsonb WHERE id=$1").bind(run).execute(&db).await?;
+                }
+                let bridge = if std::path::Path::new("/project-work").is_dir()
+                    && (!fixture || j.description.contains("[test:project-code]"))
+                    && j.execution_context
+                        .as_ref()
+                        .and_then(|c| c["agent_review"].as_object())
+                        .is_none()
+                {
+                    crate::workspace_code::prepare(&db, j.id, run, model_uid(), &dir).await
+                } else {
+                    Ok(())
+                };
+                let bridge_error = bridge.as_ref().err().cloned();
+                let prepared = if bridge.is_err() {
+                    Err::<usize, _>(Box::<dyn std::error::Error + Send + Sync>::from(
+                        "Project code preparation failed",
+                    ))
+                } else {
+                    match restore_revision_files(&db, &j, &dir).await {
+                        Ok(count) => prepare_inputs(&db, &j, &dir).await.map(|_| count),
+                        Err(e) => Err(e),
+                    }
                 };
                 if let Ok(count) = &prepared {
                     if *count > 0 {
@@ -1226,7 +1287,7 @@ pub async fn run_worker() -> WorkerResult<()> {
                     }
                 }
                 match prepared {
-                    Err(_) => ("failed".into(), String::new(), "Previous revision files are unavailable or invalid; restore the original artifacts before retrying".into()),
+                    Err(_) => ("failed".into(), String::new(), bridge_error.map(|e|format!("Project code preparation failed: {e}")).unwrap_or_else(||"Previous revision files are unavailable or invalid; restore the original artifacts before retrying".into())),
                     Ok(_) => match execute(&db, &j, run, &dir, &p, fixture, &id).await {
                         Ok(v) => v,
                         Err(_) => (

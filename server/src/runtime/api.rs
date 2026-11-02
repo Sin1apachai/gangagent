@@ -13,10 +13,11 @@ pub(crate) fn routes() -> Router<App> {
 }
 async fn standards_list(State(a): State<App>, h: HeaderMap) -> Result<Json<Value>> {
     user(&a, &h).await?;
-    let rows: Vec<Value> =
-        sqlx::query_scalar("SELECT to_jsonb(s) FROM system_standards s ORDER BY id,version")
-            .fetch_all(&a.db)
-            .await?;
+    let rows: Vec<Value> = sqlx::query_scalar(
+        "SELECT to_jsonb(s) FROM system_standards s WHERE NOT retired ORDER BY id,version",
+    )
+    .fetch_all(&a.db)
+    .await?;
     Ok(Json(json!(rows)))
 }
 #[derive(Deserialize)]
@@ -108,7 +109,7 @@ async fn list(
     let jobs:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(r)-'log' FROM runtime_jobs r WHERE task_id=$1 AND workspace_id=$2 ORDER BY created_at DESC LIMIT 20").bind(id).bind(wid).fetch_all(&a.db).await?;
     let online:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM runtime_runner WHERE heartbeat_at>now()-interval '45 seconds' AND message='ready')").fetch_one(&a.db).await?;
     Ok(Json(
-        json!({"online":online,"jobs":jobs,"standard":{"id":"application-runtime","version":1}}),
+        json!({"online":online,"jobs":jobs,"standard":{"id":"application-runtime","version":2}}),
     ))
 }
 async fn stop(

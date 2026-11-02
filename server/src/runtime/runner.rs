@@ -299,19 +299,27 @@ async fn prepare(db: &PgPool, j: &Job, dir: &FsPath) -> R<Manifest> {
     .fetch_all(db)
     .await
     .map_err(|_| "Cannot read artifact registry")?;
-    let (_, manifest_size) = files
+    let (manifest_name, manifest_size) = files
         .iter()
-        .find(|(name, _)| name == "office-run.json")
+        .find(|(name, _)| name == "code/office-run.json")
+        .or_else(|| files.iter().find(|(name, _)| name == "office-run.json"))
         .ok_or("office-run.json is missing; follow the application runtime standard")?;
     if *manifest_size > 8192 || *manifest_size < 0 {
         return Err("Runtime manifest size invalid".into());
     }
     std::fs::create_dir_all(dir).map_err(|_| "Cannot create private staging directory")?;
     let manifest_dir = dir.join("manifest");
-    copy_file(&root, &manifest_dir, "office-run.json", *manifest_size)?;
-    let m = Manifest::parse(
-        &std::fs::read(manifest_dir.join("office-run.json")).map_err(|_| "Cannot read manifest")?,
+    copy_file(&root, &manifest_dir, manifest_name, *manifest_size)?;
+    let mut m = Manifest::parse(
+        &std::fs::read(manifest_dir.join(manifest_name)).map_err(|_| "Cannot read manifest")?,
     )?;
+    if manifest_name.starts_with("code/") {
+        m.source_dir = if m.source_dir == "." {
+            "code".into()
+        } else {
+            format!("code/{}", m.source_dir)
+        };
+    }
     let source = dir.join("source");
     std::fs::create_dir_all(&source).map_err(|_| "Cannot create source staging")?;
     let mut total = 0;
@@ -544,7 +552,7 @@ async fn execute(db: &PgPool, j: &Job, dir: &FsPath) -> R<()> {
     if !valid_source(db, j).await? {
         return Err("Source changed before preview was ready".into());
     }
-    let evidence = json!({"source_run_id":j.source_run_id,"build_passed":true,"tests_passed":true,"http_passed":true,"host_port_published":true,"test_script":m.test_script,"health_path":m.health_path,"standard_version":1,"url":policy::preview_url(j.id,j.port),"scope":"build, declared test command and HTTP availability; business acceptance remains separate"});
+    let evidence = json!({"source_run_id":j.source_run_id,"build_passed":true,"tests_passed":true,"http_passed":true,"host_port_published":true,"test_script":m.test_script,"health_path":m.health_path,"standard_version":2,"url":policy::preview_url(j.id,j.port),"scope":"build, declared test command and HTTP availability; business acceptance remains separate"});
     let n=sqlx::query("UPDATE runtime_jobs SET status='ready',evidence=$1,expires_at=now()+interval '2 hours',updated_at=now() WHERE id=$2 AND NOT stop_requested").bind(evidence).bind(j.id).execute(db).await.map_err(|_|"Cannot publish runtime evidence")?.rows_affected();
     if n == 0 {
         return Err("Preview cancelled before readiness".into());

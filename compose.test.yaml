@@ -31,7 +31,7 @@ services:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
       WORKER_MODE: fixture
       ALLOW_TEST_WORKER: "1"
-    volumes: !override [runs-data:/data]
+    volumes: !override [runs-data:/data, project-work:/project-work]
     restart: "no"
   export-test:
     image: agent-office-local:latest
@@ -42,7 +42,7 @@ services:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
       WORKSPACE_OWNER_UID: "0"
       WORKSPACE_OWNER_GID: "0"
-    volumes: [runs-data:/data:ro, workspace-test-data:/workspace]
+    volumes: [runs-data:/data:ro, workspace-test-data:/workspace, project-work:/project-work]
     depends_on:
       app: {condition: service_started}
       postgres: {condition: service_healthy}
@@ -64,14 +64,14 @@ services:
       WORKER_ID: test-worker-two
       WORKER_MODE: fixture
       ALLOW_TEST_WORKER: "1"
-    volumes: [runs-data:/data]
+    volumes: [runs-data:/data, project-work:/project-work]
     depends_on:
       app: {condition: service_started}
       postgres: {condition: service_healthy}
     restart: "no"
 
   runner:
-    volumes: !override [runs-data:/data:ro, runner-data:/runner, workspace-test-data:/workspace, /var/run/docker.sock:/var/run/docker.sock]
+    volumes: !override [runs-data:/data:ro, runner-data:/runner, project-work:/project-work, workspace-test-data:/workspace, /var/run/docker.sock:/var/run/docker.sock]
     image: agent-office-runner:latest
     build: !reset null
     profiles: [runtime-test]

@@ -12,7 +12,7 @@ services:
     environment:
       WORKSPACE_OWNER_UID: ${OFFICE_HOST_UID:-1000}
       WORKSPACE_OWNER_GID: ${OFFICE_HOST_GID:-1000}
-    volumes: !override [runs-data:/data:ro, /private/tmp/office-code-host-proof:/workspace]
+    volumes: !override [runs-data:/data:ro, project-work:/project-work, /private/tmp/office-code-host-proof:/workspace]
   tests:
     environment:
       OWNER_EMAIL: code-preview@office.local

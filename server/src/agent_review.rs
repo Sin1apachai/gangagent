@@ -67,6 +67,48 @@ async fn dispatch(a: &App, wid: Uuid, id: Uuid) -> Result<()> {
     let Some((uid, title, result, criteria, agent, run, plan, attempt)) = row else {
         return Ok(());
     };
+    let code: Value = sqlx::query_scalar("SELECT usage_metrics FROM task_runs WHERE id=$1")
+        .bind(run)
+        .fetch_one(&mut *tx)
+        .await?;
+    let unavailable_code: bool = if code["project_code_state"] == "unavailable" {
+        sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM artifacts WHERE run_id=$1 AND name LIKE 'code/%')",
+        )
+        .bind(run)
+        .fetch_one(&mut *tx)
+        .await?
+    } else {
+        false
+    };
+    if unavailable_code {
+        attention(
+            &mut tx,
+            id,
+            "Worker needs an authorized project code channel before program review",
+        )
+        .await?;
+        tx.commit().await?;
+        return Ok(());
+    }
+    if code.get("project_code_request").is_some() {
+        if matches!(
+            code["project_code_state"].as_str(),
+            Some("conflict" | "failed")
+        ) {
+            attention(
+                &mut tx,
+                id,
+                "Project code could not be synchronized; resolve the code conflict before review",
+            )
+            .await?;
+            tx.commit().await?;
+            return Ok(());
+        }
+        if code["project_code_closed"] != true || code["project_code_state"] != "synced" {
+            return Ok(());
+        }
+    }
     let runtime_enabled: bool = sqlx::query_scalar("SELECT runtime_enabled FROM tasks WHERE id=$1")
         .bind(id)
         .fetch_one(&mut *tx)

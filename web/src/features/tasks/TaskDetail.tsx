@@ -413,7 +413,7 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                           !detail.artifacts.some(
                             (f) =>
                               f.run_id === detail.task.current_run_id &&
-                              f.name === "office-run.json",
+                              ["office-run.json", "code/office-run.json"].includes(f.name),
                           )
                         }
                         onClick={runtime.launch}

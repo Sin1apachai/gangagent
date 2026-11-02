@@ -23,7 +23,7 @@ class RuntimeAPI(unittest.TestCase):
  def test_standard_is_authenticated_global_and_frozen_for_both_providers(self):
   self.assertEqual(call(client(),'/standards')[0],401);rows=self.ok(call(self.admin,'/standards'));self.assertEqual(rows[0]['id'],'application-runtime');self.assertIn('office-run.json',rows[0]['instructions']);self.assertIn('0.0.0.0',rows[0]['instructions'])
   for provider in ['codex','claude']:
-   tid,d=self.source(provider=provider);s=d['task']['execution_context']['standards'][0];self.assertEqual(s['checksum'],rows[0]['checksum']);self.assertIn('Application runtime standard v1',d['task']['result'])
+   tid,d=self.source(provider=provider);s=d['task']['execution_context']['standards'][0];self.assertEqual(s['checksum'],rows[0]['checksum']);self.assertIn('Application runtime standard v2',d['task']['result'])
  def test_launch_requires_ack_and_completed_source(self):
   tid=self.ok(call(self.admin,self.base+'/tasks',{'title':'Not run','description':'No source','provider':'codex'}))['id'];route=self.base+'/tasks/'+tid+'/runtime';self.assertEqual(call(self.admin,route,{'acknowledged':True})[0],400)
   tid,_=self.source();route=self.base+'/tasks/'+tid+'/runtime';self.assertEqual(call(self.admin,route,{'acknowledged':False})[0],400);self.assertEqual(self.ok(call(self.admin,route))['jobs'],[])

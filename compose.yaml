@@ -77,6 +77,7 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - runs-data:/data
+      - project-work:/project-work
       - codex-auth:/home/office/.codex
       - claude-auth:/home/office/.claude
     depends_on:
@@ -101,6 +102,7 @@ services:
     volumes:
       - runs-data:/data:ro
       - runner-data:/runner
+      - project-work:/project-work
       - ./workspace:/workspace
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -168,6 +170,7 @@ services:
       timeout: 5s
       retries: 12
 volumes:
+  project-work:
   runner-data:
   backup-data:
   runs-data:

@@ -1,0 +1,12 @@
+{
+  "persistent_project_folder": true,
+  "same_tree_across_tasks": true,
+  "manual_host_edits_loaded_into_next_task": true,
+  "live_program_sync_during_running_task": true,
+  "conflict_preserves_host_edit": true,
+  "task_reports_not_in_program_folder": true,
+  "no_task_or_run_folders_on_host": true,
+  "managed_node_build_tests_http_from_code_prefix": true,
+  "history_mount_stays_read_only": true,
+  "model_calls": 0
+}

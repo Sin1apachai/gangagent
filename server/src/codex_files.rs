@@ -31,7 +31,12 @@ fn validate(raw: &str) -> WorkerResult<Output> {
             || f.path.len() > 240
             || parts.len() > 8
             || parts.iter().any(|p| {
-                p.starts_with('.')
+                (p.starts_with('.')
+                    && !(parts[0] == "code"
+                        && matches!(
+                            *p,
+                            ".gitignore" | ".dockerignore" | ".env.example" | ".editorconfig"
+                        )))
                     || p.is_empty()
                     || p.contains('\\')
                     || p.chars().any(char::is_control)

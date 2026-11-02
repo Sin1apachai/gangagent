@@ -66,13 +66,31 @@ async fn create_project(
         return Err(bad("Invalid project"));
     }
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO projects(id,workspace_id,name,description) VALUES($1,$2,$3,$4)")
+    let mut tx = a.db.begin().await?;
+    let mut key = crate::workspace_code::key(&mut tx, &b.name).await?;
+    if key == "app" {
+        key = "app-project".into();
+    }
+    organization::lock_workspace(&mut tx, wid).await?;
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM projects WHERE workspace_id=$1 AND code_directory_key=$2)",
+    )
+    .bind(wid)
+    .bind(&key)
+    .fetch_one(&mut *tx)
+    .await?;
+    if exists {
+        key = format!("{}-{}", key, id.simple());
+    }
+    sqlx::query("INSERT INTO projects(id,workspace_id,name,description,code_directory_key) VALUES($1,$2,$3,$4,$5)")
         .bind(id)
         .bind(wid)
         .bind(b.name.trim())
         .bind(b.description)
-        .execute(&a.db)
-        .await?;
+        .bind(key)
+        .execute(&mut *tx)
+        .await.map_err(crate::workspace_code::name_error)?;
+    tx.commit().await?;
     Ok(Json(json!({"id":id})))
 }
 async fn edit_project(

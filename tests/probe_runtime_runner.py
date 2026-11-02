@@ -51,7 +51,7 @@ def stop(j,path):
  raise AssertionError('Cleanup did not finish')
 def log(j):return ok(call(c,base+'/runtime/'+j['id']+'/logs'))['content']
 try:
- path,d=source('Russia Home — actual managed build and tests','[test:runtime-build]');assert d['task']['execution_context']['standards'][0]['version']==1;assert call(c,path+'/review',{'accept':True,'feedback':'premature'})[0]==409
+ path,d=source('Russia Home — actual managed build and tests','[test:runtime-build]');assert d['task']['execution_context']['standards'][0]['version']==2;assert call(c,path+'/review',{'accept':True,'feedback':'premature'})[0]==409
  j=wait(path)
  if j['status']!='ready':print(log(j));raise AssertionError(j)
  assert all(j['evidence'][k] for k in ['build_passed','tests_passed','http_passed','host_port_published']);assert j['evidence']['source_run_id']==d['task']['current_run_id'];assert fetch(j)[0]==200 and 'Explore Russia' in fetch(j)[1];assert 'Managed build completed' in fetch(j,'/__build-proof')[1];assert 'pass 3' in log(j)
