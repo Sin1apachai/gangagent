@@ -1365,12 +1365,12 @@ footer small {
   width: min(960px, calc(100vw - 32px));
   max-width: 960px;
 }
-.task-detail > .form-tabs {
+.task-detail .task-modal-header > .form-tabs {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow: visible;
 }
-.task-detail > .form-tabs button {
+.task-detail .task-modal-header > .form-tabs button {
   white-space: normal;
   padding: 10px 8px;
 }
@@ -1378,7 +1378,63 @@ footer small {
   max-height: 200px;
 }
 @media (max-width: 600px) {
-  .task-detail > .form-tabs {
+  .task-detail .task-modal-header > .form-tabs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Keep task identity, navigation and close control outside the scrolling content. */
+.modal.task-detail {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.task-modal-header {
+  display: block;
+  height: auto;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 24px 26px 16px;
+  border-bottom: 2px solid #c7bda7;
+  background: #fbf8ef;
+}
+.task-modal-header h2 {
+  margin: 8px 48px 12px 0;
+  overflow-wrap: anywhere;
+}
+.task-modal-header .close {
+  top: 18px;
+  right: 20px;
+}
+.task-detail .task-modal-header > .form-tabs {
+  margin: 16px 0 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.task-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 26px 26px;
+  scrollbar-gutter: stable;
+}
+.task-modal-body > [role="tabpanel"] > h3:first-child {
+  margin-top: 0;
+}
+@media (max-width: 600px) {
+  .task-modal-header {
+    padding: 16px 16px 12px;
+  }
+  .task-modal-header h2 {
+    font-size: 19px;
+    margin-right: 40px;
+  }
+  .task-modal-header .close {
+    top: 12px;
+    right: 12px;
+  }
+  .task-modal-body {
+    padding: 16px;
   }
 }
