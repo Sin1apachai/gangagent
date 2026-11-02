@@ -102,6 +102,7 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
               <span className="live-dot" />
               <b>{data.name}</b>
               <span className="muted">20 × 12 tiles</span>
+              {data.code_directory && <small style={{display:"block",overflowWrap:"anywhere"}}>โฟลเดอร์โค้ด: {data.code_directory}</small>}
             </div>
             <div>
               {!edit && canManage && (

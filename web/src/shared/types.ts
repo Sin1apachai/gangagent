@@ -110,6 +110,7 @@ export type Workspace = {
   version: number;
 };
 export type Snapshot = {
+  code_directory?: string;
   id: string;
   name: string;
   version: number;

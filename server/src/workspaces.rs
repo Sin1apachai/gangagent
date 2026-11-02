@@ -1,7 +1,7 @@
 use super::*;
 pub(crate) async fn workspaces(State(a): State<App>, h: HeaderMap) -> Result<Json<Vec<Value>>> {
     let u = user(&a, &h).await?;
-    Ok(Json(sqlx::query_scalar("SELECT json_build_object('id',w.id,'name',w.name,'version',w.version,'role',CASE WHEN $2 THEN 'super_admin' ELSE m.role END) FROM workspaces w LEFT JOIN memberships m ON m.workspace_id=w.id AND m.user_id=$1 WHERE w.deleted_at IS NULL AND ($2 OR m.user_id IS NOT NULL) ORDER BY w.created_at")
+    Ok(Json(sqlx::query_scalar("SELECT json_build_object('id',w.id,'name',w.name,'code_directory','workspace/'||w.directory_key,'version',w.version,'role',CASE WHEN $2 THEN 'super_admin' ELSE m.role END) FROM workspaces w LEFT JOIN memberships m ON m.workspace_id=w.id AND m.user_id=$1 WHERE w.deleted_at IS NULL AND ($2 OR m.user_id IS NOT NULL) ORDER BY w.created_at")
  .bind(u.id).bind(u.is_super_admin).fetch_all(&a.db).await?))
 }
 #[derive(Deserialize)]
@@ -14,23 +14,28 @@ pub(crate) async fn create_workspace(
     Json(b): Json<Name>,
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
-    if !valid(&b.name, 100) {
+    if !valid(&b.name, 100) || b.name.chars().any(|c| c.is_control()) {
         return Err(bad("Name must be 1–100 bytes"));
     }
     let id = Uuid::new_v4();
     let mut tx = a.db.begin().await?;
-    sqlx::query("INSERT INTO workspaces(id,name) VALUES($1,$2)")
+    let key = workspace_code::key(&mut tx, &b.name).await?;
+    sqlx::query("INSERT INTO workspaces(id,name,directory_key) VALUES($1,$2,$3)")
         .bind(id)
         .bind(b.name.trim())
+        .bind(&key)
         .execute(&mut *tx)
-        .await?;
+        .await
+        .map_err(workspace_code::name_error)?;
     sqlx::query("INSERT INTO memberships VALUES($1,$2,'owner')")
         .bind(id)
         .bind(u.id)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    Ok(Json(json!({"id":id,"name":b.name})))
+    Ok(Json(
+        json!({"id":id,"name":b.name.trim(),"code_directory":format!("workspace/{key}")}),
+    ))
 }
 pub(crate) async fn snapshot(
     State(a): State<App>,
@@ -40,7 +45,7 @@ pub(crate) async fn snapshot(
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
     access(&a, &u, id, false).await?;
-    let mut value:Value=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'version',version,'agents',COALESCE((SELECT json_agg(a ORDER BY a.created_at) FROM agents a WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'layout',layout,'layout_version',layout_version,'tasks',COALESCE((SELECT json_agg(t ORDER BY t.created_at DESC) FROM tasks t WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'knowledge',COALESCE((SELECT json_agg(k ORDER BY k.created_at DESC) FROM knowledge k WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json)) FROM workspaces w WHERE id=$1").bind(id).fetch_one(&a.db).await?;
+    let mut value:Value=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'code_directory','workspace/'||directory_key,'version',version,'agents',COALESCE((SELECT json_agg(a ORDER BY a.created_at) FROM agents a WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'layout',layout,'layout_version',layout_version,'tasks',COALESCE((SELECT json_agg(t ORDER BY t.created_at DESC) FROM tasks t WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'knowledge',COALESCE((SELECT json_agg(k ORDER BY k.created_at DESC) FROM knowledge k WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json)) FROM workspaces w WHERE id=$1").bind(id).fetch_one(&a.db).await?;
     if q.compact {
         if let Some(tasks) = value["tasks"].as_array_mut() {
             for task in tasks {

@@ -607,3 +607,14 @@ Runner เป็นบริการแยกที่ควบคุม Docker
 ![เว็บ Russia Home ที่เปิดผ่าน Runner จริงในระบบทดสอบ](docs/images/russia-home-preview.jpg)
 
 ผลทดสอบและข้อจำกัด: [Managed Runner verification](docs/runtime-runner-verification.md) ชุด API ปกติใช้ `./test.sh` และไม่เปิด Runner ส่วน `tests/probe_runtime_runner.py` เป็นการทดสอบ Docker จริงที่ต้องเลือกใช้โดยตั้งใจ โดยตรวจชื่อ project `agent-office-runtime-preview`, ฐานข้อมูล `office_test`, Worker แบบ fixture และการไม่มี volume บัญชี AI ก่อนเริ่ม ไม่ชี้ไปยังระบบใช้งานจริง
+
+
+### โฟลเดอร์โค้ดแยกตาม Workspace
+
+Workspace **ONE** จะมีโฟลเดอร์ `workspace/one` ใต้โฟลเดอร์ Agent Office เช่น `/Users/hall/Desktop/agent office/workspace/one` เมื่อ Agent ส่งไฟล์เสร็จ ระบบส่งออกชุดโค้ด/ผลงานไปที่ `workspace/one/tasks/<task-id>/runs/<run-id>/` โดยแยกงานและรอบ ไม่ทับไฟล์เก่า ดูพาธและสถานะได้ที่ **รายละเอียดงาน → ไฟล์ผลงาน → โฟลเดอร์โค้ดบนเครื่อง**
+
+ชื่อ Workspace ซ้ำสร้างหรือเปลี่ยนชื่อไม่ได้ รวมถึงตัวพิมพ์เล็ก/ใหญ่ ช่องว่างหัวท้าย และ Unicode ที่เทียบเท่ากัน ชื่อที่ชนโฟลเดอร์เดียวกันก็ถูกกันไว้ ชื่อในถังขยะยังถูกจอง ส่วนการเปลี่ยนชื่อแสดงผลจะไม่ย้ายโฟลเดอร์เดิม
+
+เป็นการส่งออกหลังจบงาน ไม่ใช่ sync สองทาง การแก้โค้ดบนเครื่องไม่เปลี่ยนผลงานหรือผลตรวจของรอบเดิม หากต้องเก็บส่วนที่แก้เอง ให้สำรอง `workspace/` ด้วย รัน `./setup.sh` ตอนอัปเกรดเพื่อเตรียมสิทธิ์ไฟล์ โดยไม่เปลี่ยนบัญชีเดิม
+
+[รายละเอียด ขอบเขต และการทดสอบ](docs/workspace-code-folders.md)

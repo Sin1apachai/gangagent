@@ -18,6 +18,7 @@ mod quota;
 mod recruitment;
 mod resource_metrics;
 mod runtime;
+mod workspace_code;
 mod workspaces;
 use admin::*;
 use auth::*;
@@ -87,6 +88,12 @@ struct User {
     is_super_admin: bool,
 }
 pub async fn run() {
+    if std::env::args().any(|a| a == "--workspace-exporter") {
+        workspace_code::run()
+            .await
+            .expect("Workspace export service failed");
+        return;
+    }
     if std::env::args().any(|a| a == "--runtime-runner") {
         tokio::select! { r=runtime::run_worker()=>{if r.is_err(){eprintln!("Runtime Runner stopped; inspect Docker and database connectivity");std::process::exit(1);}},_=shutdown()=>{} }
         return;
@@ -114,6 +121,9 @@ pub async fn run() {
     runtime::standards::import(&db)
         .await
         .expect("System standards import failed");
+    workspace_code::import(&db)
+        .await
+        .expect("Workspace standard import failed");
     master_data::import(&db)
         .await
         .expect("Master data import failed");
@@ -171,6 +181,7 @@ pub async fn run() {
                 .merge(master_data::routes())
                 .merge(knowledge_memory::routes())
                 .merge(runtime::routes())
+                .merge(workspace_code::routes())
                 .merge(delivery_evidence::routes())
                 .merge(task_logs::routes())
                 .merge(recruitment::routes())

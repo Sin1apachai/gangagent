@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-02",
+  "http_suite": {
+    "passed": 125,
+    "failed": 0,
+    "seconds": 314.966
+  },
+  "focused_export_api": {
+    "passed": 9,
+    "failed": 0,
+    "seconds": 12.915
+  },
+  "rust_release_tests": {
+    "passed": 42,
+    "failed": 0
+  },
+  "frontend_tests": {
+    "passed": 26,
+    "failed": 0
+  },
+  "host_bind_probe": {
+    "host_directory_created": true,
+    "actual_code_matches_every_registered_file": true,
+    "case_and_unicode_duplicate_names_blocked": true,
+    "publish_ack_recovery": true,
+    "missing_export_regenerated_after_restore": true,
+    "host_edits_not_overwritten": true,
+    "model_calls": 0
+  },
+  "production": {
+    "schema_version": 26,
+    "preserved_domain_tables": 14,
+    "workspace_one_directory_created": true,
+    "exported_runs": 7,
+    "exported_files_checksum_verified": 9,
+    "host_user_owns_exported_files": true,
+    "workspace_mount_only_on_trusted_runner": true,
+    "all_service_binary_hashes_match": true,
+    "standards_count": 2,
+    "new_model_executions": 0,
+    "new_runtime_previews": 0,
+    "maintenance_paused": false
+  },
+  "browser_code_folder_status": "ready; 7 files; workspace/one/tasks/<task>/runs/<run>"
+}

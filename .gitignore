@@ -22,3 +22,6 @@ __pycache__/
 *.log
 .pytest_cache/
 docs/screenshots/
+
+# Generated user programs; back up separately, never commit with Office
+workspace/

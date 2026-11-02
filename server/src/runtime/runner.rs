@@ -583,6 +583,7 @@ pub(crate) async fn run_worker() -> R<()> {
         .await
         .map_err(|_| "Runner database unavailable")?;
     std::fs::create_dir_all("/runner/jobs").map_err(|_| "Runner storage unavailable")?;
+    crate::workspace_code::start(db.clone());
     // Long builds must not make a healthy, busy Runner appear offline.
     let heartbeat_db = db.clone();
     tokio::spawn(async move {

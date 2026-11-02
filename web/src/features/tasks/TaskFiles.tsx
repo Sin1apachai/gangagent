@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Detail } from "../../shared/types";
+import { TaskCodeFolder } from "./TaskCodeFolder";
 import { ArtifactPreview } from "./ArtifactPreview";
 export function TaskFiles({ detail, wid }: { detail: Detail; wid: string }) {
   const [selected, setSelected] = useState(""),
@@ -25,6 +26,7 @@ export function TaskFiles({ detail, wid }: { detail: Detail; wid: string }) {
         เลือกไฟล์เพื่อเปิด Preview ไม่ต้องดาวน์โหลด
         ไฟล์อ้างอิงและบันทึกแยกจากผลงานที่สร้างใหม่
       </p>
+      <TaskCodeFolder wid={wid} taskId={detail.task.id} runId={run} />
       <div className="org-fields">
         <label>
           รอบการทำงาน

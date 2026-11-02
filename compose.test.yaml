@@ -33,8 +33,24 @@ services:
       ALLOW_TEST_WORKER: "1"
     volumes: !override [runs-data:/data]
     restart: "no"
-  tests:
+  export-test:
+    image: agent-office-local:latest
+    profiles: [test]
+    user: "0:0"
+    command: [/app/agent-office, --workspace-exporter]
+    environment:
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
+      WORKSPACE_OWNER_UID: "0"
+      WORKSPACE_OWNER_GID: "0"
+    volumes: [runs-data:/data:ro, workspace-test-data:/workspace]
     depends_on:
+      app: {condition: service_started}
+      postgres: {condition: service_healthy}
+    restart: on-failure
+  tests:
+    volumes: !override [./tests:/tests:ro, workspace-test-data:/exports]
+    depends_on:
+      export-test: {condition: service_started}
       backup: {condition: service_started}
       worker: {condition: service_started}
       worker-two: {condition: service_started}
@@ -55,9 +71,13 @@ services:
     restart: "no"
 
   runner:
+    volumes: !override [runs-data:/data:ro, runner-data:/runner, workspace-test-data:/workspace, /var/run/docker.sock:/var/run/docker.sock]
     image: agent-office-runner:latest
     build: !reset null
     profiles: [runtime-test]
     environment:
       DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
     restart: "no"
+
+volumes:
+  workspace-test-data:

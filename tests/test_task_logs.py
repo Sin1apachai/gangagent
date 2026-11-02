@@ -23,7 +23,7 @@ class TaskLogs(unittest.TestCase):
   else:self.fail('Log pagination did not end')
   self.assertEqual(text,d['runs'][0]['result']);self.assertLessEqual(len(self.ok(call(self.admin,route+'?limit=999999'))['content'].encode()),50000)
  def test_event_cursor_has_no_duplicate_or_missing_events(self):
-  path,d=self.task('[test:many-events]');before=None;events=[]
+  path,d=self.task('[test:many-events]');self.assertTrue(any(e['message']=='Run finished: review' for e in d['events']),'Completed task must include its terminal event');before=None;events=[]
   for _ in range(10):
    page=self.ok(call(self.admin,path+'/history-events'+('' if before is None else '?before='+str(before))));self.assertLessEqual(len(page['events']),20);events.extend(page['events'])
    if page['next_before'] is None:break

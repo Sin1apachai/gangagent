@@ -12,10 +12,10 @@ pub(crate) async fn rename_workspace(
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
     owner(&a, &u, id).await?;
-    if !valid(&b.name, 100) {
+    if !valid(&b.name, 100) || b.name.chars().any(|c| c.is_control()) {
         return Err(bad("Workspace name is required (max 100 bytes)"));
     }
-    let n=sqlx::query("UPDATE workspaces SET name=$1,version=version+1 WHERE id=$2 AND version=$3 AND deleted_at IS NULL").bind(b.name.trim()).bind(id).bind(b.version).execute(&a.db).await?.rows_affected();
+    let n=sqlx::query("UPDATE workspaces SET name=$1,version=version+1 WHERE id=$2 AND version=$3 AND deleted_at IS NULL").bind(b.name.trim()).bind(id).bind(b.version).execute(&a.db).await.map_err(workspace_code::name_error)?.rows_affected();
     audit(&a, &u, Some(id), "workspace.updated").await?;
     changed(n)
 }

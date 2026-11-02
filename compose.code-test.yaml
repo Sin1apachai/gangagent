@@ -1,0 +1,20 @@
+# Opt-in disposable host-export probe. Never use this project as a real Office.
+services:
+  app:
+    ports: ["127.0.0.1:8110:8080"]
+    environment:
+      OWNER_EMAIL: code-preview@office.local
+      OWNER_PASSWORD: code-preview-local-2026
+  worker:
+    environment:
+      OWNER_EMAIL: code-preview@office.local
+  export-test:
+    environment:
+      WORKSPACE_OWNER_UID: ${OFFICE_HOST_UID:-1000}
+      WORKSPACE_OWNER_GID: ${OFFICE_HOST_GID:-1000}
+    volumes: !override [runs-data:/data:ro, /private/tmp/office-code-host-proof:/workspace]
+  tests:
+    environment:
+      OWNER_EMAIL: code-preview@office.local
+      OWNER_PASSWORD: code-preview-local-2026
+    volumes: !override [./tests:/tests:ro, /private/tmp/office-code-host-proof:/exports]
