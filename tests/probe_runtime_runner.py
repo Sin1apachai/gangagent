@@ -76,7 +76,7 @@ try:
     time.sleep(.15)
  p,_=source('Nested source directory','[test:runtime-nested] [test:runtime-build]');nested=wait(p);assert nested['status']=='ready',(nested,log(nested));assert 'Managed build completed' in fetch(nested,'/__build-proof')[1];stop(nested,p);assert fetch(healthy)[0]==200;results.append('Nested source directory and explicit stop preserve other previews')
  print(json.dumps({'checks':results,'model_calls':0,'healthy_url':healthy['evidence']['url']},ensure_ascii=False),flush=True);open('/private/tmp/office-runtime-probe-results.json','w').write(json.dumps({'checks':results,'model_calls':0},indent=2))
- 
+
  # Gate Agent review on matching runtime, then keep final delivery with owner.
  for fails in [False,True]:
   lead=ok(call(c,base+'/agents',{'name':'Runtime lead','role':'Lead','instructions':'Review measured source evidence','provider':'codex','enabled':True}))['id'];dev=ok(call(c,base+'/agents',{'name':'Runtime developer','role':'Engineer','instructions':'Deliver actual source','provider':'codex','enabled':True}))['id']
