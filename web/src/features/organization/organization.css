@@ -330,3 +330,80 @@
     width: calc(100vw - 20px);
   }
 }
+
+.workflow-easy-help,
+.workflow-skill-hint {
+  color: #655e50;
+  line-height: 1.8;
+  font-size: 13px;
+}
+.workflow-steps .workflow-step-nav {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 2px 12px;
+  margin: 16px 0;
+}
+.workflow-steps .workflow-step-nav button {
+  flex: 0 0 160px;
+  display: grid;
+  gap: 7px;
+  text-align: left;
+  padding: 13px;
+  white-space: normal;
+}
+.workflow-steps .workflow-step-nav button small {
+  font-size: 12px;
+  font-weight: 400;
+}
+.workflow-steps .workflow-step-nav button.active {
+  background: #284c40;
+  color: #fff;
+  border-color: #284c40;
+}
+.workflow-step > [role="tabpanel"] > label,
+.workflow-order-label {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0;
+}
+.workflow-step textarea {
+  min-height: 90px;
+}
+.workflow-advanced {
+  border: 1px solid #d8cbb6;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 20px 0;
+  background: #faf7ef;
+}
+.workflow-advanced > summary {
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1.7;
+}
+.workflow-advanced[open] > summary {
+  margin-bottom: 16px;
+}
+.workflow-advanced .org-fields {
+  margin: 18px 0;
+}
+.workflow-advanced [role="tabpanel"] > label {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.modal.org-modal.wide {
+  width: min(1000px, calc(100vw - 48px));
+  max-width: 1000px;
+  box-sizing: border-box;
+}
+.workflow-steps .workflow-step-nav button.active small {
+  color: #f7f1dc;
+}
+@media (max-width: 600px) {
+  .modal.org-modal.wide {
+    width: calc(100vw - 24px);
+  }
+}
