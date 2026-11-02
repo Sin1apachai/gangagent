@@ -5,10 +5,16 @@ pub(crate) fn safe_relative(name: &str) -> bool {
         && !p.is_absolute()
         && p.components().all(|c| matches!(c, Component::Normal(_)))
 }
+#[derive(Deserialize, Default)]
+pub(crate) struct ArtifactOptions {
+    #[serde(default)]
+    preview: bool,
+}
 pub(crate) async fn artifact(
     State(a): State<App>,
     h: HeaderMap,
     Path((wid, id, aid)): Path<(Uuid, Uuid, Uuid)>,
+    axum::extract::Query(options): axum::extract::Query<ArtifactOptions>,
 ) -> Result<Response> {
     let u = user(&a, &h).await?;
     access(&a, &u, wid, false).await?;
@@ -36,6 +42,39 @@ pub(crate) async fn artifact(
     let bytes = tokio::fs::read(&path)
         .await
         .map_err(|_| bad("Artifact unavailable"))?;
+    if options.preview {
+        let extension = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+        if extension == "pdf" {
+            return Err(bad(
+                "PDF preview is unavailable; download the original file",
+            ));
+        }
+        let mime = match extension.as_str() {
+            "png" => Some("image/png"),
+            "jpg" | "jpeg" => Some("image/jpeg"),
+            "gif" => Some("image/gif"),
+            "webp" => Some("image/webp"),
+            _ => None,
+        };
+        if let Some(mime) = mime {
+            return Response::builder()
+                .header(header::CONTENT_TYPE, mime)
+                .header(header::CONTENT_DISPOSITION, "inline")
+                .header("content-security-policy", "default-src 'none'; sandbox")
+                .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+                .body(Body::from(bytes))
+                .map_err(|_| bad("Invalid preview response"));
+        }
+        if bytes.len() > 512 * 1024 || bytes.contains(&0) {
+            return Err(bad(
+                "Preview unavailable for this binary or large file; download it instead",
+            ));
+        }
+        let text = String::from_utf8(bytes).map_err(|_| {
+            bad("Preview supports UTF-8 text and images; download this file instead")
+        })?;
+        return Ok(Json(json!({"kind":"text","name":name,"content":text})).into_response());
+    }
     let encoded = name
         .rsplit('/')
         .next()

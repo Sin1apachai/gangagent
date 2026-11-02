@@ -1,8 +1,15 @@
+import { activeAgentTask } from "./domain/AgentActivity";
 import { RoomEngine } from "./domain/RoomEngine";
 import { drawCharacter } from "./characters";
 import React, { useEffect, useRef, useState } from "react";
 import type { Furniture, Agent, Task, Room } from "../../shared/types";
-import { LayoutEngine, catalog, type Cell } from "./domain/LayoutEngine";
+import {
+  LayoutEngine,
+  catalog,
+  objectLevel,
+  canOverlap,
+  type Cell,
+} from "./domain/LayoutEngine";
 class SpriteAtlas {
   room = new Image();
   furniture = new Image();
@@ -41,6 +48,8 @@ export function Office({
   onAgentMove?: (agent: Agent, room: Room | undefined) => void;
   roomOverlay?: React.ReactNode;
 }) {
+  const [placing, setPlacing] = useState(true),
+    [pickLayer, setPickLayer] = useState("all");
   const agentDrag = useRef<{ agent: Agent; start: Cell } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
     drag = useRef<string | null>(null);
@@ -63,7 +72,17 @@ export function Office({
     future = useRef<Furniture[][]>([]),
     [version, force] = useState(0);
   const positions = useRef<
-    Record<string, { x: number; y: number; path: Cell[]; target: string }>
+    Record<
+      string,
+      {
+        x: number;
+        y: number;
+        path: Cell[];
+        target: string;
+        activityKey?: string;
+        interaction?: ReturnType<LayoutEngine["interaction"]>;
+      }
+    >
   >({});
   const engine = new LayoutEngine(items, rooms);
   function change(next: Furniture[]) {
@@ -82,12 +101,41 @@ export function Office({
       y: c.y,
       rotation: old?.rotation ?? 0,
     };
-    const error = engine.validate(item);
+    const error =
+      old && ["desk", "meeting"].includes(old.kind)
+        ? new LayoutEngine(
+            items.filter(
+              (i) =>
+                i.id !== old.id &&
+                !(i.kind === "computer" && canOverlap(old, i)),
+            ),
+            rooms,
+          ).validate(item)
+        : engine.validate(item);
     if (error) {
       setHint("✕ " + error);
       return;
     }
-    change(old ? items.map((i) => (i.id === id ? item : i)) : [...items, item]);
+    const carried =
+      old && ["desk", "meeting"].includes(old.kind)
+        ? items.filter((i) => i.kind === "computer" && canOverlap(old, i))
+        : [];
+    const nextItems = old
+      ? items.map((i) =>
+          i.id === id
+            ? item
+            : carried.some((c) => c.id === i.id)
+              ? { ...i, x: i.x + item.x - old.x, y: i.y + item.y - old.y }
+              : i,
+        )
+      : [...items, item];
+    const nextEngine = new LayoutEngine(nextItems, rooms);
+    const invalid = nextItems.some((i) => nextEngine.validate(i));
+    if (invalid) {
+      setHint("✕ ย้ายชุดเฟอร์นิเจอร์ไม่ได้ ตรวจตำแหน่งคอมพิวเตอร์และทางเดิน");
+      return;
+    }
+    change(nextItems);
     setSelected(item.id);
     setHint("✓ วางแล้ว ยังไม่บันทึก");
   }
@@ -244,13 +292,25 @@ export function Office({
         c.restore();
       }
       c.lineWidth = 1;
-      for (const item of [...items].sort((a, b) => a.y - b.y)) {
+      for (const item of [...items].sort(
+        (a, b) => objectLevel(a.kind) - objectLevel(b.kind) || a.y - b.y,
+      )) {
         const def = catalog[item.kind];
         if (!def) continue;
         const [sx, sy, sw, sh] = def.sprite,
           { w, h } = LayoutEngine.dimensions(item);
         const x = 32 + item.x * 32,
-          y = 64 + item.y * 32;
+          y =
+            64 +
+            item.y * 32 -
+            (item.kind === "computer" &&
+            items.some(
+              (base) =>
+                ["desk", "meeting"].includes(base.kind) &&
+                canOverlap(item, base),
+            )
+              ? 12
+              : 0);
         c.save();
         c.translate(x + w * 16, y + h * 16);
         c.rotate((item.rotation * Math.PI) / 180);
@@ -295,13 +355,7 @@ export function Office({
         for (const [index, agent] of agents
           .filter((a) => a.enabled)
           .entries()) {
-          const task = tasks.find(
-            (t) =>
-              t.agent_id === agent.id &&
-              ["running", "waiting_quota", "waiting_auth", "review"].includes(
-                t.status,
-              ),
-          );
+          const task = activeAgentTask(tasks, agent.id);
           const working = task?.status === "running";
           const epoch = Math.floor(now / 8000);
           const room = new RoomEngine(rooms).assigned(agent);
@@ -310,18 +364,6 @@ export function Office({
             0,
           );
           const home = { x: seed % 20, y: Math.floor(seed / 20) % 12 };
-          const goal =
-            working || reduced
-              ? engine.nearest(home, room, !room)
-              : engine.nearest(
-                  {
-                    x: (index * 5 + epoch * 3) % 20,
-                    y: (index * 3 + epoch * 2) % 12,
-                  },
-                  room,
-                  !room,
-                );
-          const target = `${goal.x},${goal.y}`;
           let p = positions.current[agent.id];
           if (!p) {
             const start = engine.nearest(home, room, !room);
@@ -331,6 +373,33 @@ export function Office({
               target: "",
             };
           }
+          const activityKey = `${working ? "work" : task?.status || "idle"}:${working ? 0 : epoch}`;
+          if (p.activityKey !== activityKey) {
+            p.interaction =
+              !task || working
+                ? engine.interaction(
+                    { x: Math.round(p.x), y: Math.round(p.y) },
+                    index,
+                    working,
+                    room,
+                    !room,
+                  )
+                : null;
+            p.activityKey = activityKey;
+          }
+          const goal =
+            p.interaction?.point ??
+            (working || reduced
+              ? engine.nearest(home, room, !room)
+              : engine.nearest(
+                  {
+                    x: (index * 5 + epoch * 3) % 20,
+                    y: (index * 3 + epoch * 2) % 12,
+                  },
+                  room,
+                  !room,
+                ));
+          const target = `${goal.x},${goal.y}`;
           if (p.target !== target) {
             p.path = engine.path(
               { x: Math.round(p.x), y: Math.round(p.y) },
@@ -375,6 +444,36 @@ export function Office({
             c.font = "9px sans-serif";
             c.fillText("ไม่ผ่าน", x + 4, y + 34);
           }
+          const interacting =
+            p.interaction && Math.hypot(p.x - goal.x, p.y - goal.y) < 0.15;
+          if (interacting) {
+            const item = p.interaction!.item;
+            c.strokeStyle = working ? "#63b9ae" : "#d9a441";
+            c.lineWidth = 2;
+            c.strokeRect(32 + item.x * 32, 64 + item.y * 32, 32, 32);
+            if (!reduced) {
+              c.fillStyle = c.strokeStyle;
+              c.fillRect(
+                x + 24,
+                y + 10 + (Math.floor(now / 280) % 2) * 3,
+                6,
+                3,
+              );
+            }
+          }
+          const activity = interacting
+            ? p.interaction!.item.kind === "computer"
+              ? "ใช้คอมพิวเตอร์"
+              : p.interaction!.item.kind === "coffee"
+                ? "พักดื่มกาแฟ"
+                : p.interaction!.item.kind === "bookshelf"
+                  ? "อ่านหนังสือ"
+                  : working
+                    ? "ทำงานที่โต๊ะ"
+                    : "พักผ่อน"
+            : working && moving
+              ? "ไปโต๊ะทำงาน"
+              : null;
           const label =
             agent.name +
             " · " +
@@ -384,9 +483,7 @@ export function Office({
                 ? "รอ Login"
                 : task?.status === "review"
                   ? "รอตรวจ"
-                  : working
-                    ? "ทำงาน"
-                    : "ว่าง");
+                  : activity || (working ? "ทำงาน" : "ว่าง"));
           c.font = "12px sans-serif";
           const width = Math.min(c.measureText(label).width + 12, 180);
           c.fillStyle = "#fbf7ee";
@@ -413,6 +510,45 @@ export function Office({
   }
   return (
     <div className="room-engine">
+      {edit && (
+        <div className="canvas-tools" aria-label="โหมดจัดวางสิ่งของ">
+          <button
+            type="button"
+            aria-pressed={placing}
+            onClick={() => {
+              setPlacing(true);
+              setSelected(null);
+            }}
+          >
+            วางสิ่งของ
+          </button>
+          <button
+            type="button"
+            aria-pressed={!placing}
+            onClick={() => setPlacing(false)}
+          >
+            เลือก / ย้าย
+          </button>
+          <span>
+            {catalog[tool]?.name} · ชั้น {objectLevel(tool)}
+          </span>
+          {!placing && (
+            <label>
+              เลือกสิ่งของชั้น{" "}
+              <select
+                aria-label="ชั้นสิ่งของที่ต้องการเลือก"
+                value={pickLayer}
+                onChange={(e) => setPickLayer(e.target.value)}
+              >
+                <option value="all">บนสุด</option>
+                <option value="1">1 — พรม</option>
+                <option value="2">2 — เฟอร์นิเจอร์</option>
+                <option value="3">3 — คอมพิวเตอร์</option>
+              </select>
+            </label>
+          )}
+        </div>
+      )}
       <div className="room-viewport" ref={viewport}>
         <div style={{ position: "relative", width: 704 * zoom * fit }}>
           <canvas
@@ -444,7 +580,7 @@ export function Office({
               }
               if (e.key === "Enter") {
                 e.preventDefault();
-                place(cursor, selected ?? undefined);
+                place(cursor, placing ? undefined : (selected ?? undefined));
               }
               if (e.key.toLowerCase() === "r") rotate();
               if (e.key === "Escape") setSelected(null);
@@ -457,7 +593,11 @@ export function Office({
             }}
             onPointerDown={(e) => {
               const p = cell(e),
-                i = engine.hit(p.x, p.y);
+                i = engine.hit(
+                  p.x,
+                  p.y,
+                  edit && pickLayer !== "all" ? Number(pickLayer) : undefined,
+                );
               setCursor(p);
               if (onRoomPick) {
                 if (p.x >= 0 && p.x < 20 && p.y >= 0 && p.y < 12)
@@ -467,11 +607,15 @@ export function Office({
                 return;
               }
               if (edit) {
+                if (placing) {
+                  place(p);
+                  return;
+                }
                 if (i) {
                   setSelected(i.id);
                   drag.current = i.id;
                   canvas.current?.setPointerCapture(e.pointerId);
-                } else place(p);
+                }
               } else {
                 const a = agents.find((a) => {
                   const at = positions.current[a.id];

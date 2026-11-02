@@ -1,3 +1,4 @@
+import { ArtifactPreview } from "./ArtifactPreview";
 import { TaskUsage } from "./TaskUsage";
 import { TaskQuota } from "../personnel/TaskQuota";
 import { TaskExecutionContext } from "./TaskExecutionContext";
@@ -122,7 +123,13 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 { id: "usage", label: "การใช้ Token" },
               ]}
             />
-            <div hidden={taskTab !== "usage"} role="tabpanel" aria-label="การใช้ Token"><TaskUsage detail={detail} ctx={ctx} /></div>
+            <div
+              hidden={taskTab !== "usage"}
+              role="tabpanel"
+              aria-label="การใช้ Token"
+            >
+              <TaskUsage detail={detail} ctx={ctx} />
+            </div>
             <div
               role="tabpanel"
               aria-label="โจทย์และ Skill"
@@ -249,14 +256,12 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                   {detail.artifacts
                     .filter((f) => f.run_id === detail.runs[0]?.id)
                     .map((f) => (
-                      <a
-                        className="artifact-link"
+                      <ArtifactPreview
                         key={f.id}
-                        href={`/api/workspaces/${wid}/tasks/${detail.task.id}/artifacts/${f.id}`}
-                        download
-                      >
-                        {f.name} · {(f.size / 1024).toFixed(1)} KB ↓
-                      </a>
+                        wid={wid!}
+                        taskId={detail.task.id}
+                        file={f}
+                      />
                     ))}
                 </>
               )}
@@ -333,14 +338,12 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                   {detail.artifacts
                     .filter((f) => f.run_id === r.id)
                     .map((f) => (
-                      <a
-                        className="artifact-link"
+                      <ArtifactPreview
                         key={f.id}
-                        href={`/api/workspaces/${wid}/tasks/${detail.task.id}/artifacts/${f.id}`}
-                        download
-                      >
-                        {f.name} · {(f.size / 1024).toFixed(1)} KB ↓
-                      </a>
+                        wid={wid!}
+                        taskId={detail.task.id}
+                        file={f}
+                      />
                     ))}
                 </details>
               ))}

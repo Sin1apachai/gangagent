@@ -18,6 +18,24 @@ export const catalog: Record<
   wall: { name: "ผนังกั้น", w: 1, h: 1, sprite: [0, 91, 16, 16] },
   coffee: { name: "เครื่องชงกาแฟ", w: 1, h: 1, sprite: [17, 91, 16, 24] },
 };
+export const objectLevel = (kind: string) =>
+  kind === "rug" ? 1 : kind === "computer" ? 3 : 2;
+export function canOverlap(a: Furniture, b: Furniture): boolean {
+  if (a.kind === "rug" || b.kind === "rug")
+    return objectLevel(a.kind) !== objectLevel(b.kind);
+  const top = a.kind === "computer" ? a : b,
+    base = a.kind === "computer" ? b : a;
+  if (top.kind !== "computer" || !["desk", "meeting"].includes(base.kind))
+    return false;
+  const t = LayoutEngine.dimensions(top),
+    d = LayoutEngine.dimensions(base);
+  return (
+    top.x >= base.x &&
+    top.y >= base.y &&
+    top.x + t.w <= base.x + d.w &&
+    top.y + t.h <= base.y + d.h
+  );
+}
 export type Cell = { x: number; y: number };
 export class LayoutEngine {
   items: readonly Furniture[];
@@ -37,8 +55,10 @@ export class LayoutEngine {
       y: i.y + Math.floor(n / w),
     }));
   }
-  hit(x: number, y: number) {
-    return [...this.items]
+  hit(x: number, y: number, level?: number) {
+    return this.items
+      .filter((i) => level === undefined || objectLevel(i.kind) === level)
+      .sort((a, b) => objectLevel(a.kind) - objectLevel(b.kind) || a.y - b.y)
       .reverse()
       .find((i) => this.cells(i).some((c) => c.x === x && c.y === y));
   }
@@ -52,6 +72,7 @@ export class LayoutEngine {
         this.items.some(
           (o) =>
             o.id !== i.id &&
+            !canOverlap(i, o) &&
             this.cells(o).some((p) => p.x === c.x && p.y === c.y),
         ),
       )
@@ -74,6 +95,62 @@ export class LayoutEngine {
           this.cells(i).some((p) => p.x === c.x && p.y === c.y),
       )
     );
+  }
+  interaction(
+    from: Cell,
+    index: number,
+    working: boolean,
+    room?: Room,
+    common = false,
+  ): { point: Cell; item: Furniture } | null {
+    const preferred = working
+      ? ["computer", "desk", "meeting"]
+      : ["coffee", "bookshelf", "plant"];
+    const objects = this.items
+      .filter(
+        (i) =>
+          preferred.includes(i.kind) &&
+          (!room || RoomEngine.contains(room, i.x, i.y)) &&
+          (!common ||
+            !this.rooms.some((r) => RoomEngine.contains(r, i.x, i.y))),
+      )
+      .sort(
+        (a, b) =>
+          preferred.indexOf(a.kind) - preferred.indexOf(b.kind) ||
+          a.id.localeCompare(b.id),
+      );
+    if (!objects.length) return null;
+    const bestKind = objects[0].kind;
+    const preferredObjects = objects.filter((i) => i.kind === bestKind);
+    const ordered = [
+      ...preferredObjects.slice(index % preferredObjects.length),
+      ...preferredObjects.slice(0, index % preferredObjects.length),
+      ...objects.filter((i) => i.kind !== bestKind),
+    ];
+    for (const item of ordered) {
+      const cells = this.cells(item),
+        candidates = new Map<string, Cell>();
+      for (const c of cells)
+        for (const p of [
+          { x: c.x, y: c.y + 1 },
+          { x: c.x - 1, y: c.y },
+          { x: c.x + 1, y: c.y },
+          { x: c.x, y: c.y - 1 },
+        ])
+          if (
+            this.walkable(p) &&
+            (!room || RoomEngine.contains(room, p.x, p.y)) &&
+            (!common ||
+              !this.rooms.some((r) => RoomEngine.contains(r, p.x, p.y)))
+          )
+            candidates.set(`${p.x},${p.y}`, p);
+      for (const point of candidates.values()) {
+        const path = this.path(from, point);
+        const last = path[path.length - 1];
+        if (last?.x === point.x && last?.y === point.y) return { point, item };
+      }
+    }
+    return null;
   }
   nearest(c: Cell, room?: Room, common = false): Cell {
     let best: Cell = { x: 0, y: 0 },

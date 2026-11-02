@@ -127,6 +127,7 @@ pub(crate) fn valid_layout(l: &Layout) -> bool {
         return false;
     }
     let mut cells = std::collections::HashSet::new();
+    let mut occupied = std::collections::HashSet::new();
     let mut ids = std::collections::HashSet::new();
     let furniture_valid = l.items.iter().all(|i| {
         if !(0..20).contains(&i.x)
@@ -150,13 +151,52 @@ pub(crate) fn valid_layout(l: &Layout) -> bool {
             (0..h).all(|dy| {
                 (0..20).contains(&(i.x + dx))
                     && (0..12).contains(&(i.y + dy))
-                    && cells.insert((i.x + dx, i.y + dy))
+                    && occupied.insert((
+                        i.x + dx,
+                        i.y + dy,
+                        if i.kind == "rug" {
+                            1
+                        } else if i.kind == "computer" {
+                            3
+                        } else {
+                            2
+                        },
+                    ))
+                    && {
+                        cells.insert((i.x + dx, i.y + dy));
+                        true
+                    }
             })
         })
     });
     if !furniture_valid || l.rooms.len() > 20 {
         return false;
     }
+    for top in l.items.iter().filter(|i| i.kind == "computer") {
+        for base in l
+            .items
+            .iter()
+            .filter(|i| i.kind != "rug" && i.kind != "computer")
+        {
+            let (mut w, mut h) = match base.kind.as_str() {
+                "desk" | "sofa" | "bookshelf" | "board" => (2, 1),
+                "meeting" => (3, 2),
+                _ => (1, 1),
+            };
+            if base.rotation % 180 != 0 {
+                std::mem::swap(&mut w, &mut h);
+            }
+            if top.x >= base.x
+                && top.x < base.x + w
+                && top.y >= base.y
+                && top.y < base.y + h
+                && !matches!(base.kind.as_str(), "desk" | "meeting")
+            {
+                return false;
+            }
+        }
+    }
+
     let mut room_ids = std::collections::HashSet::new();
     let mut departments = std::collections::HashSet::new();
     for (index, r) in l.rooms.iter().enumerate() {
