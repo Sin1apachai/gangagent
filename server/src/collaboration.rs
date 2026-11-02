@@ -309,16 +309,19 @@ async fn approve_plan(
         )
         .await?;
         sqlx::query("INSERT INTO tasks(id,workspace_id,created_by,title,description,provider,agent_id,plan_id,execution_requested,execution_context,reviewer_id,workflow_step,acceptance_criteria,context_format) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13)").bind(tid).bind(wid).bind(u.id).bind(&step.title).bind(&step.description).bind(provider).bind(step.agent_id).bind(id).bind(context).bind(reviewer).bind(contract).bind(&step.acceptance_criteria).bind(b.context_format.as_deref().unwrap_or("compact")).execute(&mut *tx).await?;
-        sqlx::query("UPDATE tasks SET review_mode=$1,review_agent_id=$2 WHERE id=$3")
-            .bind(if terminal {
-                "owner"
-            } else {
-                step.review_mode.as_str()
-            })
-            .bind(review_agent)
-            .bind(tid)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "UPDATE tasks SET review_mode=$1,review_agent_id=$2,runtime_enabled=$4 WHERE id=$3",
+        )
+        .bind(if terminal {
+            "owner"
+        } else {
+            step.review_mode.as_str()
+        })
+        .bind(review_agent)
+        .bind(tid)
+        .bind(step.runtime_enabled)
+        .execute(&mut *tx)
+        .await?;
         for &parent in &step.depends_on {
             sqlx::query("INSERT INTO task_dependencies VALUES($1,$2)")
                 .bind(tid)

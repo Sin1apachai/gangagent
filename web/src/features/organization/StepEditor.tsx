@@ -268,6 +268,17 @@ export function StepEditor({
                     ใช้เส้นทางภายในผลงาน เช่น docs/report.md · สูงสุด 10 ไฟล์
                   </small>
                 </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    disabled={disabled}
+                    checked={s.runtime_enabled || false}
+                    onChange={(e) =>
+                      change(i, { runtime_enabled: e.target.checked })
+                    }
+                  />
+                  ให้ Runner Build / Test และเปิดเว็บจากขั้นนี้
+                </label>
                 <label>
                   วิธีตรวจงาน
                   <select

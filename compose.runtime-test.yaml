@@ -1,0 +1,10 @@
+# Disposable Runner integration environment. Use with compose.test.yaml and the exact project name below.
+services:
+  app:
+    ports: ["127.0.0.1:8107:8080"]
+    environment:
+      OWNER_EMAIL: runtime-preview@office.local
+      OWNER_PASSWORD: runtime-preview-local-2026
+  worker:
+    environment:
+      OWNER_EMAIL: runtime-preview@office.local

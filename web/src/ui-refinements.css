@@ -1367,7 +1367,7 @@ footer small {
 }
 .task-detail .task-modal-header > .form-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   overflow: visible;
 }
 .task-detail .task-modal-header > .form-tabs button {
@@ -1471,4 +1471,18 @@ footer small {
   .task-modal-footer button {
     padding: 9px 12px;
   }
+}
+
+.runtime-panel {
+  display: grid;
+  gap: 14px;
+}
+.runtime-panel p {
+  margin: 0;
+}
+.runtime-open {
+  display: inline-block;
+  padding: 10px 16px;
+  background: #253d36;
+  color: #fff7e6;
 }

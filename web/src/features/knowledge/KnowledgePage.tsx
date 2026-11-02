@@ -1,3 +1,4 @@
+import { SystemStandards } from "./SystemStandards";
 import { KnowledgeHistory } from "./KnowledgeHistory";
 import { KnowledgeSearch } from "./KnowledgeSearch";
 import React from "react";
@@ -85,6 +86,7 @@ export function KnowledgePage({ ctx }: { ctx: OfficeController }) {
     <>
       {page === "knowledge" && data && (
         <>
+          <SystemStandards />
           <KnowledgeSearch ctx={ctx} />
           <div className="section-toolbar">
             <input

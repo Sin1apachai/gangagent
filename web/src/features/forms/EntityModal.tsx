@@ -182,6 +182,7 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                     `/workspaces/${wid}/tasks` + (v?.id ? "/" + v.id : "");
                   body.agent_id = f.agent_id || null;
                   body.project_id = f.project_id || null;
+                  body.runtime_enabled = f.runtime_enabled === "on";
                   if (v?.id) {
                     method = "PUT";
                     body.version = v.version;
@@ -320,6 +321,19 @@ export function EntityModal({ ctx }: { ctx: OfficeController }) {
                           ))}
                       </select>
                     </label>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        name="runtime_enabled"
+                        defaultChecked={modal.value?.runtime_enabled ?? false}
+                      />
+                      ให้ Runner Build / Test และเปิดเว็บอัตโนมัติหลัง Agent
+                      ส่งงาน
+                    </label>
+                    <small>
+                      อนุญาตให้รันโค้ดใน Docker ตามมาตรฐาน Node.js แยกจากระบบ
+                      Office
+                    </small>
                     <label>
                       ความสำคัญ
                       <select

@@ -53,3 +53,11 @@ services:
       app: {condition: service_started}
       postgres: {condition: service_healthy}
     restart: "no"
+
+  runner:
+    image: agent-office-runner:latest
+    build: !reset null
+    profiles: [runtime-test]
+    environment:
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office_test
+    restart: "no"

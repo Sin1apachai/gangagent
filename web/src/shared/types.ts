@@ -47,6 +47,8 @@ export type Agent = {
   version: number;
 };
 export type Task = {
+  runtime_enabled?: boolean;
+  current_run_id?: string | null;
   result_truncated?: boolean;
   context_format?: "compact" | "pretty" | "focused";
   quota_auto_resume?: boolean;

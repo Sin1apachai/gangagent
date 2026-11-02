@@ -3,6 +3,8 @@ use super::*;
 pub struct TaskForm {
     #[serde(default)]
     pub context_format: Option<String>,
+    #[serde(default)]
+    pub runtime_enabled: bool,
     pub title: String,
     pub description: String,
     pub provider: String,
@@ -61,7 +63,7 @@ pub(crate) async fn create_task(
     access(&a, &u, wid, true).await?;
     check_task(&a, wid, &b).await?;
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO tasks(id,workspace_id,title,description,provider,agent_id,created_by,project_id,priority,acceptance_criteria,context_format) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)").bind(id).bind(wid).bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(u.id).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).bind(b.context_format.unwrap_or_else(||"compact".into())).execute(&a.db).await?;
+    sqlx::query("INSERT INTO tasks(id,workspace_id,title,description,provider,agent_id,created_by,project_id,priority,acceptance_criteria,context_format,runtime_enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)").bind(id).bind(wid).bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(u.id).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).bind(b.context_format.unwrap_or_else(||"compact".into())).bind(b.runtime_enabled).execute(&a.db).await?;
     audit(&a, &u, Some(wid), "task.created").await?;
     Ok(Json(json!({"id":id,"status":"queued"})))
 }
@@ -74,7 +76,7 @@ pub(crate) async fn edit_task(
     let u = user(&a, &h).await?;
     access(&a, &u, wid, true).await?;
     check_task(&a, wid, &b).await?;
-    let n=sqlx::query("UPDATE tasks SET title=$1,description=$2,provider=$3,agent_id=$4,project_id=$8,priority=$9,acceptance_criteria=$10,version=version+1 WHERE id=$5 AND workspace_id=$6 AND version=$7 AND deleted_at IS NULL AND status!='running' AND NOT execution_requested AND workflow_step IS NULL AND review_for_task_id IS NULL AND (execution_context IS NULL OR (provider=$3 AND agent_id IS NOT DISTINCT FROM $4))").bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).execute(&a.db).await?.rows_affected();
+    let n=sqlx::query("UPDATE tasks SET title=$1,description=$2,provider=$3,agent_id=$4,project_id=$8,priority=$9,acceptance_criteria=$10,runtime_enabled=$11,version=version+1 WHERE id=$5 AND workspace_id=$6 AND version=$7 AND deleted_at IS NULL AND status!='running' AND NOT execution_requested AND workflow_step IS NULL AND review_for_task_id IS NULL AND (execution_context IS NULL OR (provider=$3 AND agent_id IS NOT DISTINCT FROM $4))").bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).bind(b.runtime_enabled).execute(&a.db).await?.rows_affected();
     audit(&a, &u, Some(wid), "task.updated").await?;
     changed(n)
 }
@@ -141,6 +143,9 @@ pub(crate) async fn run_task(
                 .await?;
         }
     }
+    if n > 0 {
+        runtime::attach_feedback(&mut tx, wid, id).await?;
+    }
     tx.commit().await?;
     if n == 0 {
         return Err(Error(StatusCode::CONFLICT,"Enable your provider connection, check billing acknowledgement, task ownership/state, and the three-attempt limit"));
@@ -177,6 +182,15 @@ pub(crate) async fn review_task(
     }
     let mut tx = a.db.begin().await?;
     organization::lock_workspace(&mut tx, wid).await?;
+    if b.accept {
+        let blocked:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tasks t WHERE t.id=$1 AND t.workspace_id=$2 AND t.runtime_enabled AND NOT EXISTS(SELECT 1 FROM runtime_jobs r WHERE r.task_id=t.id AND r.source_run_id=t.current_run_id AND r.status='ready' AND r.evidence->>'tests_passed'='true' AND r.evidence->>'http_passed'='true'))").bind(id).bind(wid).fetch_one(&mut *tx).await?;
+        if blocked {
+            return Err(Error(
+                StatusCode::CONFLICT,
+                "Runner build, tests and HTTP health must pass before accepting this task",
+            ));
+        }
+    }
     let assigned:Option<Option<Uuid>>=sqlx::query_scalar("SELECT reviewer_id FROM tasks WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL FOR UPDATE").bind(id).bind(wid).fetch_optional(&mut *tx).await?;
     if let Some(Some(reviewer)) = assigned {
         if reviewer != u.id && !u.is_super_admin {

@@ -1,3 +1,4 @@
+import { TaskRuntime, useTaskRuntime } from "./TaskRuntime";
 import { TaskFiles } from "./TaskFiles";
 import { TaskHistory } from "./TaskHistory";
 import { TaskUsage } from "./TaskUsage";
@@ -86,6 +87,7 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
     showTask,
   } = ctx;
   const [taskTab, setTaskTab] = useState("brief");
+  const runtime = useTaskRuntime(ctx, taskTab === "runtime");
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
@@ -143,6 +145,7 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                   { id: "brief", label: "โจทย์และ Skill" },
                   { id: "result", label: "ผลงานและตรวจรับ" },
                   { id: "files", label: "ไฟล์ผลงาน" },
+                  { id: "runtime", label: "เปิดโปรแกรม" },
                   { id: "history", label: "ประวัติและบันทึก" },
                   { id: "usage", label: "การใช้ Token" },
                 ]}
@@ -288,6 +291,15 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
               </div>
               <div
                 role="tabpanel"
+                aria-label="เปิดโปรแกรม"
+                hidden={taskTab !== "runtime"}
+              >
+                {taskTab === "runtime" && (
+                  <TaskRuntime ctx={ctx} runtime={runtime} />
+                )}
+              </div>
+              <div
+                role="tabpanel"
                 aria-label="ไฟล์ผลงาน"
                 hidden={taskTab !== "files"}
               >
@@ -388,6 +400,35 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 )}
               </div>
               <div className="task-footer-primary">
+                {taskTab === "runtime" &&
+                  canWrite &&
+                  !detail.task.review_for_task_id && (
+                    <>
+                      <button
+                        className="primary"
+                        disabled={
+                          busy ||
+                          !runtime.ack ||
+                          !["review", "done"].includes(detail.task.status) ||
+                          !detail.artifacts.some(
+                            (f) =>
+                              f.run_id === detail.task.current_run_id &&
+                              f.name === "office-run.json",
+                          )
+                        }
+                        onClick={runtime.launch}
+                      >
+                        Build / Test / เปิดเว็บ
+                      </button>
+                      {runtime.job &&
+                        !["stopped", "failed"].includes(runtime.job.status) && (
+                          <button disabled={busy} onClick={runtime.stop}>
+                            หยุดโปรแกรม
+                          </button>
+                        )}
+                    </>
+                  )}
+
                 {detail.task.status === "done" &&
                   !detail.task.review_for_task_id &&
                   canWrite && (

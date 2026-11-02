@@ -50,15 +50,19 @@ async fn inspect(
             }
         }
     }
+    let required:i64=sqlx::query_scalar("SELECT count(*) FROM tasks WHERE plan_id=$1 AND workspace_id=$2 AND runtime_enabled AND review_for_task_id IS NULL AND deleted_at IS NULL").bind(id).bind(wid).fetch_one(&a.db).await?;
+    let verified:i64=sqlx::query_scalar("SELECT count(*) FROM tasks t WHERE t.plan_id=$1 AND t.workspace_id=$2 AND t.runtime_enabled AND t.review_for_task_id IS NULL AND t.deleted_at IS NULL AND EXISTS(SELECT 1 FROM runtime_jobs r WHERE r.task_id=t.id AND r.source_run_id=t.current_run_id AND r.status IN('ready','stopped') AND r.evidence->>'tests_passed'='true' AND r.evidence->>'http_passed'='true')").bind(id).bind(wid).fetch_one(&a.db).await?;
     Ok(Json(
-        json!({"code_files":code,"deliverable_files":files.len(),"empty_compose_files":placeholders,"runtime_verified":false,"assessment":if files.is_empty(){"no_deliverables"}else if code==0{"documents_only"}else{"runtime_not_verified"},"message":if placeholders>0{"พบ Compose ที่ยังไม่มีบริการ จึงยังเปิดโปรแกรมจากไฟล์นี้ไม่ได้"}else if code==0&&!files.is_empty(){"พบเอกสาร แต่ยังไม่พบไฟล์โค้ดโปรแกรมในชุดส่งมอบ"}else{"ต้องตรวจหลักฐาน build และทดสอบจริงก่อนยืนยันว่ารันได้"}}),
+        json!({"code_files":code,"deliverable_files":files.len(),"empty_compose_files":placeholders,"runtime_verified":required>0&&verified==required,"runtime_required":required,"runtime_verified_count":verified,"assessment":if required>0&&verified==required{"runtime_verified"}else if files.is_empty(){"no_deliverables"}else if code==0{"documents_only"}else{"runtime_not_verified"},"message":if required>0&&verified==required{"Runner ตรวจ Build / Test / HTTP ผ่านสำหรับงานที่กำหนดแล้ว"}else if placeholders>0{"พบ Compose ที่ยังไม่มีบริการ จึงยังเปิดโปรแกรมจากไฟล์นี้ไม่ได้"}else if code==0&&!files.is_empty(){"พบเอกสาร แต่ยังไม่พบไฟล์โค้ดโปรแกรมในชุดส่งมอบ"}else{"ต้องตรวจหลักฐาน build และทดสอบจริงก่อนยืนยันว่ารันได้"}}),
     ))
 }
 fn is_code(name: &str) -> bool {
     matches!(
         name.rsplit('.').next(),
         Some(
-            "rs" | "tsx"
+            "rs" | "mjs"
+                | "cjs"
+                | "tsx"
                 | "ts"
                 | "js"
                 | "jsx"

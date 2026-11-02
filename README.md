@@ -583,3 +583,25 @@ Skill ที่ผูกกับ Agent ยังคงถูกส่งเข�
 ![ตัวละครเดินไปทำงานกับชุดพรม โต๊ะ และคอมจากระบบทดสอบ](docs/images/furniture-layers-interaction.jpg)
 
 ระดับชั้นคำนวณจากชนิดสิ่งของใน layout เดิม ไม่เพิ่มพิกัด Agent หรือช่องกรอกระดับในฐานข้อมูล ดู [ผลทดสอบพรีวิวและออฟฟิศซ้อนชั้น](docs/preview-and-office-layers-report.md)
+
+
+### สร้างโปรแกรมแล้วเปิดบนเครื่องด้วย Runner
+
+เลือก **ให้ Runner Build / Test และเปิดเว็บอัตโนมัติหลัง Agent ส่งงาน** ตอนสร้างงาน หรือกำหนดในขั้นตอน Workflow ก่อนอนุมัติแผน เมื่อ Agent ส่งไฟล์ ระบบจะ Build → Test → ตรวจ HTTP ให้อัตโนมัติ โดยไม่ต้องเข้า Container ไปพิมพ์คำสั่งเอง สำหรับงานเดิม เปิดรายละเอียดงาน → แท็บ **เปิดโปรแกรม** → ยืนยันการรัน → **Build / Test / เปิดเว็บ** ในแถบล่างของ Modal
+
+เมื่อสถานะ **พร้อมเปิดเว็บ** ให้กด **เปิดเว็บบนเครื่องนี้** ระบบแสดง URL เฉพาะ Preview เช่น `http://preview-<id>.localhost:19000` พร้อมหลักฐานของ source run ที่ทดสอบจริง มีปุ่มหยุดและประวัติ Log แยกจาก Log ของ Agent; Preview หยุดอัตโนมัติในสองชั่วโมง การผ่าน HTTP ยืนยันว่าเปิดเว็บได้ ไม่ใช่การรับรองฟังก์ชันธุรกิจทั้งหมด ผู้ใช้ยังตรวจรับผลงานสุดท้ายได้ตาม Workflow
+
+มาตรฐานกลางอยู่ที่ **Knowledge → มาตรฐานกลางสำหรับ Agent** นำเข้าจากไฟล์ [application-runtime-v1.md](server/standards/application-runtime-v1.md) เมื่อระบบเริ่ม และแนบในบริบทงานใหม่ทุก Workspace/ทั้ง Codex และ Claude งานเก่าที่ไม่มีมาตรฐานจะได้รับผ่าน prompt สำรอง Agent ต้องส่ง source จริง, `office-run.json`, `package.json`, `package-lock.json` และชุดทดสอบ เมื่อแก้งานหรือ retry ระบบแนบผล Runner รอบก่อนให้ผู้สร้างงาน และผู้ตรวจที่เป็น Agent ต้องมีหลักฐานพร้อมใช้งานตรง source run ก่อนผ่านงานที่เปิด Runner
+
+**ขอบเขตรุ่นแรก:** Node.js รวมถึง React ที่ build เป็น production assets และให้ Node serve ไฟล์; ยังไม่รัน Compose ที่ Agent เขียนเองหรือรองรับฐานข้อมูลของโปรแกรมลูก/ทุกภาษาโดยอัตโนมัติ Server ต้องฟัง `0.0.0.0:process.env.PORT` (Runner กำหนด 3000) ตัวอย่างไฟล์ครบอยู่ใน [runtime-node](server/fixtures/runtime-node) ไฟล์ตัวอย่างนี้ใช้ทดสอบ ไม่สร้างข้อมูลตัวอย่างลง Workspace ใช้งานจริง
+
+Runner เป็นบริการแยกที่ควบคุม Docker บนเครื่องเดียวกัน Worker และเว็บ Office ไม่มี Docker socket โปรแกรมลูกไม่มีบัญชี AI/ฐานข้อมูล Office หรือโฟลเดอร์เครื่องผู้ใช้ ใช้ source ที่ลงทะเบียนของงานเท่านั้น (สูงสุด 100 ไฟล์/50MB) พื้นที่ทำงานชั่วคราวจำกัด 512MB, ติดตั้ง dependency จาก npm registry ด้วย lockfile v3 และปิด install hooks, build จำกัด 1GB/1 CPU และไม่มีเครือข่าย, แอปจำกัด 512MB/1 CPU ระบบใช้ Gateway เฉพาะที่เปิดบน loopback และโดเมนย่อย `.localhost` เพื่อแยก cookie กับ Office ไม่รองรับ WebSocket ในรุ่นนี้ สูงสุด 3 Preview ต่อเจ้าของงาน/6 รวม
+
+การย้ายเครื่องให้สำรองข้อมูล Office และ source ตามระบบสำรองปกติ Preview เป็นสภาพแวดล้อมชั่วคราว ไม่รวม runtime volume ใน Backup ให้เปิดใหม่จาก source เมื่อย้ายเครื่อง Docker ต้องทำงานอยู่และมี image Node.js; การดึง image/ติดตั้ง dependencies ต้องใช้อินเทอร์เน็ตและใช้ทรัพยากรเครื่อง แต่ไม่เรียก API โมเดลเพิ่มเพื่อ Build/Test
+
+
+![รายละเอียดงานและปุ่มเปิด Preview](docs/images/office-runtime-panel.jpg)
+
+![เว็บ Russia Home ที่เปิดผ่าน Runner จริงในระบบทดสอบ](docs/images/russia-home-preview.jpg)
+
+ผลทดสอบและข้อจำกัด: [Managed Runner verification](docs/runtime-runner-verification.md) ชุด API ปกติใช้ `./test.sh` และไม่เปิด Runner ส่วน `tests/probe_runtime_runner.py` เป็นการทดสอบ Docker จริงที่ต้องเลือกใช้โดยตั้งใจ โดยตรวจชื่อ project `agent-office-runtime-preview`, ฐานข้อมูล `office_test`, Worker แบบ fixture และการไม่มี volume บัญชี AI ก่อนเริ่ม ไม่ชี้ไปยังระบบใช้งานจริง

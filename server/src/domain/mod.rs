@@ -23,6 +23,8 @@ pub(crate) struct PlanStep {
     pub review_mode: String,
     #[serde(default)]
     pub review_agent_id: Option<Uuid>,
+    #[serde(default)]
+    pub runtime_enabled: bool,
 }
 fn owner_review() -> String {
     "owner".into()
@@ -93,6 +95,7 @@ mod tests {
             reviewer_id: None,
             review_mode: "owner".into(),
             review_agent_id: None,
+            runtime_enabled: false,
         };
         assert!(!PlanPolicy::validate(&[s.clone()]));
         s.depends_on.clear();

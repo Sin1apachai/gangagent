@@ -1,0 +1,49 @@
+{
+  "checks": [
+    "Real Docker image, bounded install/build, three Node HTTP tests, localhost Gateway, build output, source evidence, cookie/host isolation and container restrictions",
+    "Unsafe manifest rejected and isolated cleanup verified",
+    "Failing tests rejected and isolated cleanup verified",
+    "Producer retry receives previous failing test evidence",
+    "Failing HTTP check rejected and isolated cleanup verified",
+    "Nested source directory and explicit stop preserve other previews",
+    "Cancelling the plan stops its accepted source preview",
+    "Reviewer waits for matching runtime; accepted work creates Knowledge and final task stays with owner",
+    "Failed runtime cannot be passed by naive Agent reviewer",
+    "Expired preview cleaned automatically without affecting another workspace",
+    "Runner restart cleans interrupted job without replay; existing ready preview survives",
+    "Busy Runner heartbeat updates independently while a runtime operation is still active"
+  ],
+  "model_calls": 0,
+  "date": "2026-11-02",
+  "http_suite": {
+    "passed": 116,
+    "failed": 0,
+    "duration_seconds": 333.32
+  },
+  "rust_release_tests": {
+    "passed": 40,
+    "failed": 0
+  },
+  "frontend_tests": {
+    "passed": 26,
+    "failed": 0
+  },
+  "node_fixture_http_tests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "live_model_inference_tested": false,
+  "production": {
+    "schema_version": 25,
+    "domain_fingerprints_preserved": 14,
+    "standard_rows": 1,
+    "new_runtime_jobs": 0,
+    "maintenance_paused": false,
+    "runner_online": true,
+    "docker_socket_only_on_runner": true,
+    "runner_has_no_provider_auth_mounts": true,
+    "all_service_binary_hashes_match": true,
+    "http_health_login_standards_and_workspaces": true,
+    "model_calls": 0
+  }
+}

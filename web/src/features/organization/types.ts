@@ -12,6 +12,7 @@ export type Skill = {
   deleted_at?: string | null;
 };
 export type Step = {
+  runtime_enabled?: boolean;
   title: string;
   description: string;
   agent_id: string;

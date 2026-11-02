@@ -37,3 +37,12 @@ WORKDIR /app
 COPY --from=rust-build /build/agent-office-bin /app/agent-office
 ENTRYPOINT ["/app/agent-office"]
 CMD ["--backup-worker"]
+
+FROM docker:29.9.2-cli@sha256:5e6baf67325a79f64ed3bed6863954d5e05d0f3d4e57cbdb14809346814bbfdb AS docker-cli
+FROM ${RUNTIME_BASE} AS runner
+USER root
+WORKDIR /app
+COPY --from=rust-build /build/agent-office-bin /app/agent-office
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/ /usr/local/libexec/docker/cli-plugins/
+CMD ["/app/agent-office", "--runtime-runner"]

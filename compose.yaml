@@ -86,6 +86,28 @@ services:
     init: true
     pids_limit: 256
     mem_limit: 2g
+  runner:
+    image: agent-office-runner:latest
+    build:
+      context: .
+      target: runner
+      args:
+        RUNTIME_BASE: ${OFFICE_RUNTIME_BASE:-debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3}
+    user: "0:0"
+    environment:
+      DATABASE_URL: postgres://office:${POSTGRES_PASSWORD}@postgres:5432/office
+    volumes:
+      - runs-data:/data:ro
+      - runner-data:/runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      app: {condition: service_started}
+      postgres: {condition: service_healthy}
+    restart: unless-stopped
+    init: true
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
   codex-login:
     image: agent-office-worker:latest
     profiles: [auth]
@@ -143,6 +165,7 @@ services:
       timeout: 5s
       retries: 12
 volumes:
+  runner-data:
   backup-data:
   runs-data:
   codex-auth:

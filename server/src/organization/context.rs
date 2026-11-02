@@ -18,7 +18,7 @@ pub(crate) async fn freeze_context(
     required: &[Uuid],
     contract: Option<Value>,
 ) -> Result<Value> {
-    let mut context = json!({"schema":1,"agent":null,"skills":[],"workflow":contract});
+    let mut context = json!({"schema":1,"agent":null,"skills":[],"workflow":contract,"standards":[crate::runtime::standards::bundled()]});
     if let Some(id) = agent {
         let row:Option<Value>=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'role',role,'instructions',instructions,'department',department,'responsibilities',responsibilities,'decision_scope',decision_scope,'manager_id',manager_id,'agent_version',version,'model',model,'birth_date',birth_date,'personality',personality) FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL").bind(id).bind(wid).fetch_optional(&mut **tx).await?;
         context["agent"] = row.ok_or(bad("Agent unavailable"))?;

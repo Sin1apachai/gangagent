@@ -17,6 +17,7 @@ mod personal_workers;
 mod quota;
 mod recruitment;
 mod resource_metrics;
+mod runtime;
 mod workspaces;
 use admin::*;
 use auth::*;
@@ -86,6 +87,11 @@ struct User {
     is_super_admin: bool,
 }
 pub async fn run() {
+    if std::env::args().any(|a| a == "--runtime-runner") {
+        tokio::select! { r=runtime::run_worker()=>{if r.is_err(){eprintln!("Runtime Runner stopped; inspect Docker and database connectivity");std::process::exit(1);}},_=shutdown()=>{} }
+        return;
+    }
+
     if std::env::args().any(|a| a == "--backup-worker") {
         tokio::select! {r=backup::run_worker()=>{if r.is_err(){eprintln!("Backup service stopped; check database, artifact storage and disk capacity");std::process::exit(1);}},_=shutdown()=>{}}
         return;
@@ -105,6 +111,9 @@ pub async fn run() {
         .run(&db)
         .await
         .expect("Migration failed");
+    runtime::standards::import(&db)
+        .await
+        .expect("System standards import failed");
     master_data::import(&db)
         .await
         .expect("Master data import failed");
@@ -142,6 +151,7 @@ pub async fn run() {
     quota::scheduler(app.db.clone());
     monitoring::start(app.clone());
     agent_review::start(app.clone());
+    runtime::start(app.clone());
     let api = Router::new()
         .route("/health", get(health))
         .route("/auth/login", post(login))
@@ -160,6 +170,7 @@ pub async fn run() {
                 .merge(model_selection::routes())
                 .merge(master_data::routes())
                 .merge(knowledge_memory::routes())
+                .merge(runtime::routes())
                 .merge(delivery_evidence::routes())
                 .merge(task_logs::routes())
                 .merge(recruitment::routes())

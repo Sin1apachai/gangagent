@@ -47,7 +47,7 @@ async fn events(
     };
     Ok(Json(json!({"events":rows,"next_before":next})))
 }
-fn window(text: &str, before: Option<usize>, limit: usize) -> (usize, usize) {
+pub(crate) fn window(text: &str, before: Option<usize>, limit: usize) -> (usize, usize) {
     let mut end = before.unwrap_or(text.len()).min(text.len());
     while !text.is_char_boundary(end) {
         end -= 1;
