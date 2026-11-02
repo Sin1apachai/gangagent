@@ -159,34 +159,45 @@ export function OrganizationPage({ ctx }: { ctx: OfficeController }) {
             {skills
               .filter((s) => !!s.deleted_at === archived)
               .map((s) => (
-                <article className="panel skill-card" key={s.id}>
-                  <span className="skill-icon">✦</span>
-                  <div className="org-card-title">
-                    <h3>{s.title}</h3>
-                    <span className="tag">v{s.version + 1}</span>
+                <article className="panel skill-card bounded-card" key={s.id}>
+                  <div className="card-header">
+                    <span className="skill-icon">✦</span>
+                    <div className="org-card-title">
+                      <h3>{s.title}</h3>
+                      <span className="tag">v{s.version + 1}</span>
+                    </div>
                   </div>
-                  <p>{s.description || "ยังไม่มีคำอธิบาย"}</p>
-                  <small>
-                    มอบหมายให้{" "}
-                    {org.bindings.filter((b) => b.skill_id === s.id).length}{" "}
-                    Agent
-                  </small>
-                  <div className="actions">
-                    <button onClick={() => setSkill({ ...s })}>
-                      {canWrite && !s.deleted_at ? "แก้ไข" : "ดูรายละเอียด"}
-                    </button>
-                    <button onClick={() => showHistory("skills", s.id)}>
-                      ประวัติเวอร์ชัน
-                    </button>
-                    {canWrite && (
-                      <button
-                        onClick={() =>
-                          run(() => archive("skills", s.id, !!s.deleted_at))
-                        }
-                      >
-                        {s.deleted_at ? "กู้คืน" : "เก็บถาวร"}
+                  <div
+                    className="card-body"
+                    role="region"
+                    aria-label={`เนื้อหา Skill ${s.title}`}
+                    tabIndex={0}
+                  >
+                    <p>{s.description || "ยังไม่มีคำอธิบาย"}</p>
+                    <small>
+                      มอบหมายให้{" "}
+                      {org.bindings.filter((b) => b.skill_id === s.id).length}{" "}
+                      Agent
+                    </small>
+                  </div>
+                  <div className="card-footer">
+                    <div className="actions">
+                      <button onClick={() => setSkill({ ...s })}>
+                        {canWrite && !s.deleted_at ? "แก้ไข" : "ดูรายละเอียด"}
                       </button>
-                    )}
+                      <button onClick={() => showHistory("skills", s.id)}>
+                        ประวัติเวอร์ชัน
+                      </button>
+                      {canWrite && (
+                        <button
+                          onClick={() =>
+                            run(() => archive("skills", s.id, !!s.deleted_at))
+                          }
+                        >
+                          {s.deleted_at ? "กู้คืน" : "เก็บถาวร"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}
@@ -267,59 +278,75 @@ export function OrganizationPage({ ctx }: { ctx: OfficeController }) {
             {workflows
               .filter((w) => !!w.deleted_at === archived)
               .map((w) => (
-                <article className="panel workflow-card" key={w.id}>
-                  <div className="org-card-title">
-                    <h3>{w.title}</h3>
-                    <span className="tag">v{w.version + 1}</span>
+                <article
+                  className="panel workflow-card bounded-card"
+                  key={w.id}
+                >
+                  <div className="card-header">
+                    <div className="org-card-title">
+                      <h3>{w.title}</h3>
+                      <span className="tag">v{w.version + 1}</span>
+                    </div>
                   </div>
-                  <p>{w.description || "ยังไม่มีคำอธิบาย"}</p>
-                  <ol className="workflow-map">
-                    {w.steps.map((s, i) => (
-                      <li key={i}>
-                        <b>
-                          {i + 1}. {s.title}
-                        </b>
-                        <small>
-                          {org.agents.find((a) => a.id === s.agent_id)?.name ||
-                            "Agent ไม่พร้อม"}{" "}
-                          ·{" "}
-                          {s.depends_on.length
-                            ? `รอ ${s.depends_on.map((d) => d + 1).join(", ")}`
-                            : "เริ่มต้น"}
-                        </small>
-                      </li>
-                    ))}
-                  </ol>
-                  <div className="actions">
-                    {canWrite && !w.deleted_at && (
-                      <button
-                        className="primary"
-                        onClick={() =>
-                          setLaunch({
-                            workflow: w,
-                            goal: "",
-                            request_id: crypto.randomUUID(),
-                          })
-                        }
-                      >
-                        ใช้สร้างแผน
+                  <div
+                    className="card-body"
+                    role="region"
+                    aria-label={`ขั้นตอน Workflow ${w.title}`}
+                    tabIndex={0}
+                  >
+                    <p>{w.description || "ยังไม่มีคำอธิบาย"}</p>
+                    <ol className="workflow-map">
+                      {w.steps.map((s, i) => (
+                        <li key={i}>
+                          <b>
+                            {i + 1}. {s.title}
+                          </b>
+                          <small>
+                            {org.agents.find((a) => a.id === s.agent_id)
+                              ?.name || "Agent ไม่พร้อม"}{" "}
+                            ·{" "}
+                            {s.depends_on.length
+                              ? `รอ ${s.depends_on.map((d) => d + 1).join(", ")}`
+                              : "เริ่มต้น"}
+                          </small>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  <div className="card-footer">
+                    <div className="actions">
+                      {canWrite && !w.deleted_at && (
+                        <button
+                          className="primary"
+                          onClick={() =>
+                            setLaunch({
+                              workflow: w,
+                              goal: "",
+                              request_id: crypto.randomUUID(),
+                            })
+                          }
+                        >
+                          ใช้สร้างแผน
+                        </button>
+                      )}
+                      <button onClick={() => setWorkflow(structuredClone(w))}>
+                        {canWrite && !w.deleted_at ? "แก้ไข" : "ดูรายละเอียด"}
                       </button>
-                    )}
-                    <button onClick={() => setWorkflow(structuredClone(w))}>
-                      {canWrite && !w.deleted_at ? "แก้ไข" : "ดูรายละเอียด"}
-                    </button>
-                    <button onClick={() => showHistory("workflows", w.id)}>
-                      ประวัติเวอร์ชัน
-                    </button>
-                    {canWrite && (
-                      <button
-                        onClick={() =>
-                          run(() => archive("workflows", w.id, !!w.deleted_at))
-                        }
-                      >
-                        {w.deleted_at ? "กู้คืน" : "เก็บถาวร"}
+                      <button onClick={() => showHistory("workflows", w.id)}>
+                        ประวัติเวอร์ชัน
                       </button>
-                    )}
+                      {canWrite && (
+                        <button
+                          onClick={() =>
+                            run(() =>
+                              archive("workflows", w.id, !!w.deleted_at),
+                            )
+                          }
+                        >
+                          {w.deleted_at ? "กู้คืน" : "เก็บถาวร"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}

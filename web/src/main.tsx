@@ -9,3 +9,5 @@ createRoot(document.getElementById("root")!).render(
 );
 
 import "./ui-refinements.css";
+
+import "./shared/bounded-cards.css";

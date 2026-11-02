@@ -43,89 +43,102 @@ function TaskCard({ task, ctx }: { task: Task; ctx: OfficeController }) {
     task.status !== "running" &&
     !task.execution_requested;
   return (
-    <article className={`task-card board-card state-${task.status}`}>
-      <div className="board-card-labels">
-        <span className={`provider-label provider-${task.provider}`}>
-          {task.provider === "codex" ? "Codex" : "Claude"}
-        </span>
-        {!needsAttention(task) && (
-          <span className={`board-card-status card-status-${task.status}`}>
-            {statusLabel[task.status]}
+    <article
+      className={`task-card board-card bounded-card state-${task.status}`}
+    >
+      <div className="card-header">
+        <div className="board-card-labels">
+          <span className={`provider-label provider-${task.provider}`}>
+            {task.provider === "codex" ? "Codex" : "Claude"}
           </span>
-        )}
-        {task.priority && task.priority !== "normal" && (
-          <span className={`priority-label priority-${task.priority}`}>
-            {priorityLabel[task.priority] ?? task.priority}
-          </span>
-        )}
-        {needsAttention(task) && (
-          <span className="attention-label">{statusLabel[task.status]}</span>
-        )}
-      </div>
-      <h4>
-        <button
-          className="board-card-title"
-          title={task.title}
-          disabled={ctx.busy}
-          onClick={open}
-        >
-          {task.title}
-        </button>
-      </h4>
-      <p className="board-card-description">
-        {task.description || "ยังไม่มีรายละเอียดงาน"}
-      </p>
-      {task.error && <p className="board-card-error">{task.error}</p>}
-      <div className="board-card-meta">
-        <span className="assignee-avatar" aria-hidden="true">
-          {agent?.name.slice(0, 1) ?? "◇"}
-        </span>
-        <span>
-          {agent?.name ??
-            (task.agent_id ? "Agent ไม่พร้อมใช้งาน" : "ยังไม่ระบุ Agent")}
-        </span>
-        <time dateTime={task.created_at}>
-          {new Date(task.created_at).toLocaleDateString("th-TH", {
-            day: "numeric",
-            month: "short",
-          })}
-        </time>
-      </div>
-      {task.execution_requested && (
-        <p className="board-card-queue" role="status">
-          {task.status === "running"
-            ? "กำลังทำงาน"
-            : "ส่งคำขอแล้ว · รอ Worker / งานก่อนหน้า"}
-        </p>
-      )}
-      <div className="board-card-actions">
-        <button
-          className={task.status === "review" ? "primary" : ""}
-          disabled={ctx.busy}
-          onClick={open}
-        >
-          {action} <span aria-hidden="true">↗</span>
-        </button>
-        {editable && (
+          {!needsAttention(task) && (
+            <span className={`board-card-status card-status-${task.status}`}>
+              {statusLabel[task.status]}
+            </span>
+          )}
+          {task.priority && task.priority !== "normal" && (
+            <span className={`priority-label priority-${task.priority}`}>
+              {priorityLabel[task.priority] ?? task.priority}
+            </span>
+          )}
+          {needsAttention(task) && (
+            <span className="attention-label">{statusLabel[task.status]}</span>
+          )}
+        </div>
+        <h4>
           <button
-            className="board-edit"
+            className="board-card-title"
+            title={task.title}
             disabled={ctx.busy}
-            onClick={() => ctx.setModal({ kind: "task", value: task })}
+            onClick={open}
           >
-            แก้ไข
+            {task.title}
           </button>
+        </h4>
+      </div>
+      <div
+        className="card-body"
+        role="region"
+        aria-label={`รายละเอียดงาน ${task.title}`}
+        tabIndex={0}
+      >
+        <p className="board-card-description">
+          {task.description || "ยังไม่มีรายละเอียดงาน"}
+        </p>
+        {task.error && <p className="board-card-error">{task.error}</p>}
+        {task.execution_requested && (
+          <p className="board-card-queue" role="status">
+            {task.status === "running"
+              ? "กำลังทำงาน"
+              : "ส่งคำขอแล้ว · รอ Worker / งานก่อนหน้า"}
+          </p>
         )}
-        {task.status === "queued" &&
-          ctx.canWrite &&
-          task.created_by === ctx.user?.id && (
+      </div>
+      <div className="card-footer">
+        <div className="board-card-meta">
+          <span className="assignee-avatar" aria-hidden="true">
+            {agent?.name.slice(0, 1) ?? "◇"}
+          </span>
+          <span>
+            {agent?.name ??
+              (task.agent_id ? "Agent ไม่พร้อมใช้งาน" : "ยังไม่ระบุ Agent")}
+          </span>
+          <time dateTime={task.created_at}>
+            {new Date(task.created_at).toLocaleDateString("th-TH", {
+              day: "numeric",
+              month: "short",
+            })}
+          </time>
+        </div>
+        <div className="board-card-actions">
+          <button
+            className={task.status === "review" ? "primary" : ""}
+            disabled={ctx.busy}
+            onClick={open}
+          >
+            {action} <span aria-hidden="true">↗</span>
+          </button>
+          {editable && (
             <button
-              className="primary board-start"
-              disabled={ctx.busy || task.execution_requested}
-              onClick={() => ctx.run(() => ctx.start(task))}
+              className="board-edit"
+              disabled={ctx.busy}
+              onClick={() => ctx.setModal({ kind: "task", value: task })}
             >
-              เริ่มงาน
+              แก้ไข
             </button>
           )}
+          {task.status === "queued" &&
+            ctx.canWrite &&
+            task.created_by === ctx.user?.id && (
+              <button
+                className="primary board-start"
+                disabled={ctx.busy || task.execution_requested}
+                onClick={() => ctx.run(() => ctx.start(task))}
+              >
+                เริ่มงาน
+              </button>
+            )}
+        </div>
       </div>
     </article>
   );

@@ -111,80 +111,91 @@ export function TeamPage({ ctx }: { ctx: OfficeController }) {
                 (a.name + a.role).toLowerCase().includes(query.toLowerCase()),
               )
               .map((a, i) => (
-                <article key={a.id}>
-                  <div className={"pixel-avatar a" + (i % 3)}>
-                    <CharacterSprite id={a.character_id ?? 0} />
+                <article key={a.id} className="bounded-card agent-card">
+                  <div className="card-header">
+                    <div className={"pixel-avatar a" + (i % 3)}>
+                      <CharacterSprite id={a.character_id ?? 0} />
+                    </div>
+                    <span className="eyebrow">{a.provider.toUpperCase()}</span>
+                    <h2 title={a.name}>{a.name}</h2>
                   </div>
-                  <span className="eyebrow">{a.provider.toUpperCase()}</span>
-                  <h2>{a.name}</h2>
-                  <p>{a.role}</p>
-                  <SelectionRibbon agent={a} />
-                  {a.personality && (
-                    <p className="muted">
-                      {a.personality.zodiac_name} ·{" "}
-                      {a.personality.traits.map((t) => t.name).join(" / ")}
-                    </p>
-                  )}
-                  <span className="tag">
-                    {!a.enabled
-                      ? "ปิดใช้งาน"
-                      : data.tasks.some(
-                            (t) =>
-                              t.agent_id === a.id && t.status === "running",
-                          )
-                        ? "กำลังทำงาน"
+                  <div
+                    className="card-body"
+                    role="region"
+                    aria-label={`ข้อมูล Agent ${a.name}`}
+                    tabIndex={0}
+                  >
+                    <p>{a.role}</p>
+                    <SelectionRibbon agent={a} />
+                    {a.personality && (
+                      <p className="muted">
+                        {a.personality.zodiac_name} ·{" "}
+                        {a.personality.traits.map((t) => t.name).join(" / ")}
+                      </p>
+                    )}
+                    <span className="tag">
+                      {!a.enabled
+                        ? "ปิดใช้งาน"
                         : data.tasks.some(
                               (t) =>
-                                t.agent_id === a.id &&
-                                t.status === "waiting_quota",
+                                t.agent_id === a.id && t.status === "running",
                             )
-                          ? "รอรีเซ็ต"
-                          : "ว่าง"}
-                  </span>
-                  <p className="muted">
-                    โมเดล: {a.model || "ค่าเริ่มต้นผู้ให้บริการ"}
-                  </p>
-                  <p className="agent-instructions">
-                    {a.instructions || "ยังไม่มีคำสั่งประจำตัว"}
-                  </p>
-                  <small>
-                    ห้อง:{" "}
-                    {new RoomEngine(data.layout.rooms ?? []).assigned(a)
-                      ?.name ?? "ส่วนกลาง"}
-                    {a.office_placement === undefined ||
-                    a.office_placement === "auto"
-                      ? " · จัดอัตโนมัติ"
-                      : ""}
-                  </small>
-                  {canWrite && (
-                    <div className="actions">
-                      <button
-                        onClick={() => setModal({ kind: "agent", value: a })}
-                      >
-                        แก้ไข
-                      </button>
-                      {canManage && (
+                          ? "กำลังทำงาน"
+                          : data.tasks.some(
+                                (t) =>
+                                  t.agent_id === a.id &&
+                                  t.status === "waiting_quota",
+                              )
+                            ? "รอรีเซ็ต"
+                            : "ว่าง"}
+                    </span>
+                    <p className="muted">
+                      โมเดล: {a.model || "ค่าเริ่มต้นผู้ให้บริการ"}
+                    </p>
+                    <p className="agent-instructions">
+                      {a.instructions || "ยังไม่มีคำสั่งประจำตัว"}
+                    </p>
+                    <small>
+                      ห้อง:{" "}
+                      {new RoomEngine(data.layout.rooms ?? []).assigned(a)
+                        ?.name ?? "ส่วนกลาง"}
+                      {a.office_placement === undefined ||
+                      a.office_placement === "auto"
+                        ? " · จัดอัตโนมัติ"
+                        : ""}
+                    </small>
+                  </div>
+                  <div className="card-footer">
+                    {canWrite && (
+                      <div className="actions">
                         <button
-                          onClick={() => {
-                            ctx.setOrgAgentId(a.id);
-                            setPage("organization");
-                          }}
+                          onClick={() => setModal({ kind: "agent", value: a })}
                         >
-                          ฝ่าย หน้าที่ และขอบเขต
+                          แก้ไข
                         </button>
-                      )}
-                      <button
-                        onClick={() =>
-                          setModal({
-                            kind: "delete",
-                            value: { kind: "agents", item: a },
-                          })
-                        }
-                      >
-                        ลบ
-                      </button>
-                    </div>
-                  )}
+                        {canManage && (
+                          <button
+                            onClick={() => {
+                              ctx.setOrgAgentId(a.id);
+                              setPage("organization");
+                            }}
+                          >
+                            ฝ่าย หน้าที่ และขอบเขต
+                          </button>
+                        )}
+                        <button
+                          onClick={() =>
+                            setModal({
+                              kind: "delete",
+                              value: { kind: "agents", item: a },
+                            })
+                          }
+                        >
+                          ลบ
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </article>
               ))}
           </div>

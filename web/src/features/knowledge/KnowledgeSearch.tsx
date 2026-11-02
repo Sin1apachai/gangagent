@@ -61,13 +61,24 @@ export function KnowledgeSearch({ ctx }: { ctx: OfficeController }) {
           : "ค้นจากความรู้ที่ตรวจสอบแล้ว · Full-text Search พร้อมใช้งานแม้โมเดลค้นหายังไม่พร้อม"}
       </p>
       {hits.map((h) => (
-        <article className="provider-box" key={h.id}>
-          <span className="tag">{h.workspace_name} · ตรวจสอบแล้ว</span>
-          <h4>{h.title}</h4>
-          <p className="preserve">{h.content}</p>
-          <small>
-            ที่มา: {h.source || "ผู้ใช้บันทึก"} · Workspace {h.workspace_id}
-          </small>
+        <article className="provider-box bounded-card" key={h.id}>
+          <div className="card-header">
+            <span className="tag">{h.workspace_name} · ตรวจสอบแล้ว</span>
+            <h4 title={h.title}>{h.title}</h4>
+          </div>
+          <div
+            className="card-body"
+            role="region"
+            aria-label={`ผลค้นหา ${h.title}`}
+            tabIndex={0}
+          >
+            <p className="preserve">{h.content}</p>
+          </div>
+          <div className="card-footer">
+            <small>
+              ที่มา: {h.source || "ผู้ใช้บันทึก"} · Workspace {h.workspace_id}
+            </small>
+          </div>
         </article>
       ))}
       {searched && !hits.length && <p>ไม่พบความรู้ที่ตรงกับคำค้น</p>}

@@ -1,0 +1,122 @@
+/* Common card shell: only the middle content scrolls, actions stay visible. */
+.bounded-card.bounded-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  max-height: var(--card-max-height, 420px);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.bounded-card > .card-header,
+.bounded-card > .card-footer {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 14px 16px;
+  background: #fbf8ef;
+}
+.bounded-card > .card-header {
+  border-bottom: 1px solid #d5ccb7;
+}
+.bounded-card > .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 14px 16px;
+  overflow-wrap: anywhere;
+}
+.bounded-card > .card-body:focus-visible {
+  outline: 2px solid #627d6d;
+  outline-offset: -3px;
+}
+.bounded-card > .card-footer {
+  border-top: 1px solid #d5ccb7;
+  margin-top: auto;
+}
+.bounded-card > .card-footer:empty {
+  display: none;
+}
+.bounded-card .card-header h2,
+.bounded-card .card-header h3,
+.bounded-card .card-header h4 {
+  margin: 6px 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.bounded-card .card-footer .actions,
+.bounded-card .card-footer .board-card-actions {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bounded-card .card-body > :first-child {
+  margin-top: 0;
+}
+.bounded-card .card-body > :last-child {
+  margin-bottom: 0;
+}
+.bounded-card .card-body p {
+  white-space: pre-wrap;
+}
+.bounded-card .agent-instructions {
+  max-height: none;
+  overflow: visible;
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.agent-card {
+  --card-max-height: 480px;
+}
+.skill-card {
+  --card-max-height: 360px;
+}
+.workflow-card {
+  --card-max-height: 440px;
+}
+.project-card {
+  --card-max-height: 360px;
+}
+.room-card {
+  --card-max-height: 210px;
+}
+.master-card {
+  --card-max-height: 300px;
+}
+.recruitment-card {
+  --card-max-height: 420px;
+}
+.task-workbench .bounded-card {
+  --card-max-height: 360px;
+}
+.task-workbench .bounded-card .board-card-description,
+.task-workbench .bounded-card .board-card-error {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-height: none;
+  overflow: visible;
+}
+.task-workbench .bounded-card .board-card-labels {
+  margin: 0 0 8px;
+}
+.task-workbench .bounded-card .board-card-meta {
+  margin: 0 0 10px;
+}
+.team-grid .bounded-card .pixel-avatar {
+  margin: 0 auto 8px;
+}
+.bounded-card .card-footer button {
+  max-width: 100%;
+  white-space: normal;
+}
+.bounded-card .card-footer small {
+  overflow-wrap: anywhere;
+}

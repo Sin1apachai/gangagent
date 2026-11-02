@@ -110,46 +110,61 @@ export function KnowledgePage({ ctx }: { ctx: OfficeController }) {
                   .includes(query.toLowerCase()),
               )
               .map((k) => (
-                <article key={k.id}>
-                  <span className="tag">
-                    {k.verified ? "ตรวจสอบแล้ว · แนบให้ AI ได้" : "รอตรวจสอบ"}
-                  </span>
-                  <h3>{k.title}</h3>
-                  <p>{k.content}</p>
-                  <small>แหล่งที่มา: {k.source || "ผู้ใช้บันทึก"}</small>
-                  {k.verified && (
-                    <details>
-                      <summary>อ้างอิงเป็นเอกสารบังคับในงาน</summary>
-                      <code
-                        style={{ overflowWrap: "anywhere" }}
-                      >{`[[knowledge:${k.id}]]`}</code>
-                      <p>
-                        คัดลอกข้อความนี้ลงรายละเอียดงานเพื่อเลือกเอกสารนี้ในโหมดทดลอง
-                      </p>
-                    </details>
-                  )}
-                  <KnowledgeHistory wid={wid!} id={k.id} version={k.version} />
-                  {canWrite && (
-                    <div className="actions">
-                      <button
-                        onClick={() =>
-                          setModal({ kind: "knowledge", value: k })
-                        }
-                      >
-                        แก้ไข
-                      </button>
-                      <button
-                        onClick={() =>
-                          setModal({
-                            kind: "delete",
-                            value: { kind: "knowledge", item: k },
-                          })
-                        }
-                      >
-                        ลบ
-                      </button>
-                    </div>
-                  )}
+                <article key={k.id} className="bounded-card knowledge-card">
+                  <div className="card-header">
+                    <span className="tag">
+                      {k.verified ? "ตรวจสอบแล้ว · แนบให้ AI ได้" : "รอตรวจสอบ"}
+                    </span>
+                    <h3 title={k.title}>{k.title}</h3>
+                  </div>
+                  <div
+                    className="card-body"
+                    role="region"
+                    aria-label={`เนื้อหา Knowledge ${k.title}`}
+                    tabIndex={0}
+                  >
+                    <p>{k.content}</p>
+                    <small>แหล่งที่มา: {k.source || "ผู้ใช้บันทึก"}</small>
+                    {k.verified && (
+                      <details>
+                        <summary>อ้างอิงเป็นเอกสารบังคับในงาน</summary>
+                        <code
+                          style={{ overflowWrap: "anywhere" }}
+                        >{`[[knowledge:${k.id}]]`}</code>
+                        <p>
+                          คัดลอกข้อความนี้ลงรายละเอียดงานเพื่อเลือกเอกสารนี้ในโหมดทดลอง
+                        </p>
+                      </details>
+                    )}
+                    <KnowledgeHistory
+                      wid={wid!}
+                      id={k.id}
+                      version={k.version}
+                    />
+                  </div>
+                  <div className="card-footer">
+                    {canWrite && (
+                      <div className="actions">
+                        <button
+                          onClick={() =>
+                            setModal({ kind: "knowledge", value: k })
+                          }
+                        >
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={() =>
+                            setModal({
+                              kind: "delete",
+                              value: { kind: "knowledge", item: k },
+                            })
+                          }
+                        >
+                          ลบ
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </article>
               ))}
           </div>

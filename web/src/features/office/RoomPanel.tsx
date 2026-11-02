@@ -27,21 +27,31 @@ export function RoomPanel({
       )}
       <div className="room-cards">
         {rooms.map((r, n) => (
-          <article key={r.id} className="room-card">
-            <div className="room-card-title">
+          <article key={r.id} className="room-card bounded-card">
+            <div className="room-card-title card-header">
               <span className={"room-swatch room-color-" + (n % 4)} />
               <h4>{r.name}</h4>
             </div>
-            <p>{r.department || "ห้องส่วนกลาง"}</p>
-            <small>
-              {
-                agents.filter(
-                  (a) =>
-                    a.enabled && new RoomEngine(rooms).assigned(a)?.id === r.id,
-                ).length
-              }{" "}
-              Agent ประจำห้อง
-            </small>
+            <div
+              className="card-body"
+              role="region"
+              aria-label={`รายละเอียดห้อง ${r.name}`}
+              tabIndex={0}
+            >
+              <p>{r.department || "ห้องส่วนกลาง"}</p>
+            </div>
+            <div className="card-footer">
+              <small>
+                {
+                  agents.filter(
+                    (a) =>
+                      a.enabled &&
+                      new RoomEngine(rooms).assigned(a)?.id === r.id,
+                  ).length
+                }{" "}
+                Agent ประจำห้อง
+              </small>
+            </div>
           </article>
         ))}
       </div>

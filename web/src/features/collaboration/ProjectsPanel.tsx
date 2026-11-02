@@ -186,11 +186,12 @@ export function ProjectsPanel({
           return (
             <article
               className={
-                "project-card" + (created === p.id ? " newly-created" : "")
+                "project-card bounded-card" +
+                (created === p.id ? " newly-created" : "")
               }
               key={p.id}
             >
-              <div className="project-card-heading">
+              <div className="project-card-heading card-header">
                 <div>
                   <span className="eyebrow">
                     {p.deleted_at ? "อยู่ในถังขยะ" : "PROJECT"}
@@ -215,21 +216,28 @@ export function ProjectsPanel({
                   </details>
                 )}
               </div>
-              <p className="project-description">
-                {p.description ||
-                  "ยังไม่มีรายละเอียด เพิ่มได้ภายหลังจากปุ่มแก้ไข"}
-              </p>
-              <div className="project-task-count">
-                {tasks.length
-                  ? `${tasks.length} งานทั้งหมด · เสร็จแล้ว ${done} งาน`
-                  : "ยังไม่มีงานในโปรเจกต์นี้"}
-              </div>
-              {created === p.id && !tasks.length && (
-                <p className="project-next-step">
-                  พร้อมแล้ว เริ่มจากสร้างงานแรกให้ทีมของคุณ
+              <div
+                className="card-body"
+                role="region"
+                aria-label={`รายละเอียดโปรเจกต์ ${p.name}`}
+                tabIndex={0}
+              >
+                <p className="project-description">
+                  {p.description ||
+                    "ยังไม่มีรายละเอียด เพิ่มได้ภายหลังจากปุ่มแก้ไข"}
                 </p>
-              )}
-              <div className="project-actions">
+                <div className="project-task-count">
+                  {tasks.length
+                    ? `${tasks.length} งานทั้งหมด · เสร็จแล้ว ${done} งาน`
+                    : "ยังไม่มีงานในโปรเจกต์นี้"}
+                </div>
+                {created === p.id && !tasks.length && (
+                  <p className="project-next-step">
+                    พร้อมแล้ว เริ่มจากสร้างงานแรกให้ทีมของคุณ
+                  </p>
+                )}
+              </div>
+              <div className="project-actions card-footer">
                 {p.deleted_at ? (
                   ctx.canWrite && (
                     <button

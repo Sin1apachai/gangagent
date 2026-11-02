@@ -166,6 +166,10 @@ docker compose down
 
 รายละเอียดและผลทดสอบ: [Supervisor review and focused Task modal](docs/supervisor-review-and-task-modal.md)
 
+### การ์ดที่อ่านเนื้อหาได้โดยปุ่มไม่หลุด
+
+การ์ด Knowledge, Team, Skill, Workflow, กระดานงาน โปรเจกต์ และรายการการ์ดอื่น ๆ แยก **Header / Body / Footer** โดยจำกัดความสูงตามประเภท ข้อความยาวเลื่อนเฉพาะ Body ส่วนชื่อและปุ่มท้ายการ์ดยังอยู่ในกรอบ เนื้อหาเดิมไม่ได้ถูกลบหรือตัดออก ดู [ขนาดและผลทดสอบการ์ด](docs/bounded-card-layout-check.md)
+
 ### 6. เก็บและค้นหาความรู้
 
 **Skill คือวิธีทำงาน ส่วน Knowledge คือข้อมูลที่ทีมใช้อ้างอิง** เช่น Skill อธิบายวิธีเขียนข้อกำหนด ส่วน Knowledge เก็บกฎและขอบเขตที่เจ้าของยืนยันแล้ว

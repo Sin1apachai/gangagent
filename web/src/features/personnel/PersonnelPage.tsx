@@ -132,20 +132,33 @@ export function PersonnelPage({ ctx }: { ctx: OfficeController }) {
                 {(
                   master?.[section as "zodiac" | "trait" | "criterion"] || []
                 ).map((entry) => (
-                  <article key={entry.id}>
-                    <span className="eyebrow">{entry.id}</span>
-                    <h3>{entry.name}</h3>
-                    {entry.start && entry.end && (
-                      <p>
-                        {entry.start[1]}/{entry.start[0]} – {entry.end[1]}/
-                        {entry.end[0]}
-                      </p>
-                    )}
-                    <p>{entry.instructions || entry.description}</p>
-                    {entry.caution && <small>ควรระวัง: {entry.caution}</small>}
-                    {entry.weight && (
-                      <span className="tag">น้ำหนัก {entry.weight}%</span>
-                    )}
+                  <article key={entry.id} className="bounded-card master-card">
+                    <div className="card-header">
+                      <span className="eyebrow">{entry.id}</span>
+                      <h3 title={entry.name}>{entry.name}</h3>
+                    </div>
+                    <div
+                      className="card-body"
+                      role="region"
+                      aria-label={`ข้อมูลตั้งต้น ${entry.name}`}
+                      tabIndex={0}
+                    >
+                      {entry.start && entry.end && (
+                        <p>
+                          {entry.start[1]}/{entry.start[0]} – {entry.end[1]}/
+                          {entry.end[0]}
+                        </p>
+                      )}
+                      <p>{entry.instructions || entry.description}</p>
+                      {entry.caution && (
+                        <small>ควรระวัง: {entry.caution}</small>
+                      )}
+                    </div>
+                    <div className="card-footer">
+                      {entry.weight && (
+                        <span className="tag">น้ำหนัก {entry.weight}%</span>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
@@ -185,62 +198,76 @@ export function PersonnelPage({ ctx }: { ctx: OfficeController }) {
             {apps
               .filter((a) => filter === "all" || a.status === filter)
               .map((a) => (
-                <article key={a.id} className="panel">
-                  <div className="org-card-title">
-                    <div>
-                      <h3>{a.candidate_name}</h3>
-                      <p>{a.role_title}</p>
-                    </div>
-                    <span
-                      className={`tag ${a.passed === false ? "selected-reject" : ""}`}
-                    >
-                      {labels[a.status]}
-                    </span>
-                  </div>
-                  {a.reason && <p className="preserve">เหตุผล: {a.reason}</p>}
-                  {a.scores && (
-                    <details>
-                      <summary>คะแนนและหลักฐาน</summary>
-                      {a.scores.map((s) => (
-                        <p key={s.criterion_id}>
-                          <b>
-                            {master?.criterion.find(
-                              (c) => c.id === s.criterion_id,
-                            )?.name || s.criterion_id}{" "}
-                            · {s.score}/100
-                          </b>
-                          <br />
-                          {s.reason}
-                        </p>
-                      ))}
-                    </details>
-                  )}
-                  <small>
-                    {new Date(a.created_at).toLocaleString("th-TH")}
-                  </small>
-                  <div className="actions">
-                    <button onClick={() => ctx.setPage("plans")}>
-                      เปิดแผนคัดเลือก
-                    </button>
-                    {a.status === "awaiting_decision" && canManage && (
-                      <button
-                        className="primary"
-                        disabled={busy}
-                        onClick={() =>
-                          run(async () => {
-                            await api(
-                              `/workspaces/${wid}/recruitment/${a.id}/decision`,
-                              { version: a.version },
-                            );
-                            await load();
-                            await ctx.refresh();
-                            ctx.setMessage("นำผลคัดเลือกจาก Agent มาใช้แล้ว");
-                          })
-                        }
+                <article
+                  key={a.id}
+                  className="panel bounded-card recruitment-card"
+                >
+                  <div className="card-header">
+                    <div className="org-card-title">
+                      <div>
+                        <h3>{a.candidate_name}</h3>
+                        <p>{a.role_title}</p>
+                      </div>
+                      <span
+                        className={`tag ${a.passed === false ? "selected-reject" : ""}`}
                       >
-                        ใช้ผลคัดเลือกจาก Agent
-                      </button>
+                        {labels[a.status]}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className="card-body"
+                    role="region"
+                    aria-label={`ผลคัดเลือก ${a.candidate_name}`}
+                    tabIndex={0}
+                  >
+                    {a.reason && <p className="preserve">เหตุผล: {a.reason}</p>}
+                    {a.scores && (
+                      <details>
+                        <summary>คะแนนและหลักฐาน</summary>
+                        {a.scores.map((s) => (
+                          <p key={s.criterion_id}>
+                            <b>
+                              {master?.criterion.find(
+                                (c) => c.id === s.criterion_id,
+                              )?.name || s.criterion_id}{" "}
+                              · {s.score}/100
+                            </b>
+                            <br />
+                            {s.reason}
+                          </p>
+                        ))}
+                      </details>
                     )}
+                    <small>
+                      {new Date(a.created_at).toLocaleString("th-TH")}
+                    </small>
+                  </div>
+                  <div className="card-footer">
+                    <div className="actions">
+                      <button onClick={() => ctx.setPage("plans")}>
+                        เปิดแผนคัดเลือก
+                      </button>
+                      {a.status === "awaiting_decision" && canManage && (
+                        <button
+                          className="primary"
+                          disabled={busy}
+                          onClick={() =>
+                            run(async () => {
+                              await api(
+                                `/workspaces/${wid}/recruitment/${a.id}/decision`,
+                                { version: a.version },
+                              );
+                              await load();
+                              await ctx.refresh();
+                              ctx.setMessage("นำผลคัดเลือกจาก Agent มาใช้แล้ว");
+                            })
+                          }
+                        >
+                          ใช้ผลคัดเลือกจาก Agent
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}
