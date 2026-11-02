@@ -21,6 +21,7 @@ import { furniture, statusLabel } from "../../shared/constants";
 import { Office } from "../office/Office";
 import type { OfficeController } from "../../application/useOfficeController";
 export function OfficePage({ ctx }: { ctx: OfficeController }) {
+  const [placing, setPlacing] = useState(false);
   const [editTab, setEditTab] = useState("furniture");
   const [roomPending, setRoomPending] = useState(false);
   const {
@@ -87,6 +88,9 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
   } = ctx;
   useEffect(() => {
     if (!edit) setRoomPending(false);
+  }, [edit, wid]);
+  useEffect(() => {
+    setPlacing(false);
   }, [edit, wid]);
   if (!user) return null;
   return (
@@ -217,6 +221,8 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
                 items={items}
                 edit={edit && editTab === "furniture"}
                 tool={tool}
+                placing={placing}
+                onPlacingChange={setPlacing}
                 onChange={setItems}
                 agents={data.agents}
                 tasks={data.tasks}
@@ -265,8 +271,11 @@ export function OfficePage({ ctx }: { ctx: OfficeController }) {
               {furniture.map(([k, n]) => (
                 <button
                   key={k}
-                  className={tool === k ? "chosen" : ""}
-                  onClick={() => setTool(k)}
+                  className={placing && tool === k ? "chosen" : ""}
+                  onClick={() => {
+                    setTool(k);
+                    setPlacing(true);
+                  }}
                 >
                   {n}
                 </button>

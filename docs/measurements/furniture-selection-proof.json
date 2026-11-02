@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-02",
+  "frontend_tests_passed": 26,
+  "typescript_and_vite_build": "passed",
+  "isolated_project": "agent-office-furniture-preview",
+  "database": "office_test",
+  "browser_checks": [
+    "Selection mode is the editor default and has a visible active state",
+    "Single click on the right cell of a two-cell desk selects without changing layout or enabling undo",
+    "Dragging from the right cell preserves the grab offset: desk moves from (4,4) to (6,6)",
+    "Saved layout retains two original items after drag",
+    "Catalogue selection switches to placement mode; explicit select button switches back",
+    "Removing an existing plant, undo and redo work",
+    "Empty-space click followed by Enter does not create furniture in selection mode",
+    "Saved layout contains only the original desk at (6,6) after plant removal"
+  ],
+  "production_health": "ok",
+  "live_model_calls": 0
+}

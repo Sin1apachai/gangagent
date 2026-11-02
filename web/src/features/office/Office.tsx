@@ -34,6 +34,8 @@ export function Office({
   onRoomPick,
   onAgentMove,
   roomOverlay,
+  placing: controlledPlacing,
+  onPlacingChange,
 }: {
   items: Furniture[];
   rooms?: Room[];
@@ -47,12 +49,19 @@ export function Office({
   onRoomPick?: (room: Room | undefined) => void;
   onAgentMove?: (agent: Agent, room: Room | undefined) => void;
   roomOverlay?: React.ReactNode;
+  placing?: boolean;
+  onPlacingChange?: (placing: boolean) => void;
 }) {
-  const [placing, setPlacing] = useState(true),
+  const [localPlacing, setLocalPlacing] = useState(false),
     [pickLayer, setPickLayer] = useState("all");
+  const placing = controlledPlacing ?? localPlacing;
+  function setPlacing(value: boolean) {
+    setLocalPlacing(value);
+    onPlacingChange?.(value);
+  }
   const agentDrag = useRef<{ agent: Agent; start: Cell } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
-    drag = useRef<string | null>(null);
+    drag = useRef<{ id: string; start: Cell; offset: Cell } | null>(null);
   const [selected, setSelected] = useState<string | null>(null),
     [cursor, setCursor] = useState<Cell>({ x: 0, y: 0 }),
     [hint, setHint] = useState(""),
@@ -85,6 +94,20 @@ export function Office({
     >
   >({});
   const engine = new LayoutEngine(items, rooms);
+  const selectedItem = items.find((item) => item.id === selected);
+  useEffect(() => {
+    setSelected(null);
+    setHint("");
+    drag.current = null;
+  }, [edit, placing, tool]);
+  function removeSelected() {
+    if (!selectedItem) return;
+    drag.current = null;
+    change(items.filter((item) => item.id !== selectedItem.id));
+    setSelected(null);
+    setHint("✓ นำสิ่งของออกแล้ว ยังไม่บันทึก · กดย้อนกลับเพื่อคืนได้");
+  }
+
   function change(next: Furniture[]) {
     history.current.push(structuredClone(items));
     if (history.current.length > 60) history.current.shift();
@@ -166,6 +189,7 @@ export function Office({
     if (previous) {
       future.current.push(structuredClone(items));
       onChange(previous);
+      setHint("✓ ย้อนกลับแล้ว ยังไม่บันทึก");
       force((v) => v + 1);
     }
   }
@@ -174,6 +198,7 @@ export function Office({
     if (next) {
       history.current.push(structuredClone(items));
       onChange(next);
+      setHint("✓ ทำซ้ำแล้ว ยังไม่บันทึก");
       force((v) => v + 1);
     }
   }
@@ -527,10 +552,10 @@ export function Office({
             aria-pressed={!placing}
             onClick={() => setPlacing(false)}
           >
-            เลือก / ย้าย
+            เลือกของที่วางแล้ว
           </button>
           <span>
-            {catalog[tool]?.name} · ชั้น {objectLevel(tool)}
+            {placing ? `${catalog[tool]?.name} · ชั้น ${objectLevel(tool)}` : "คลิกสิ่งของเพื่อเลือก · ลากย้ายหรือนำออก"}
           </span>
           {!placing && (
             <label>
@@ -580,12 +605,13 @@ export function Office({
               }
               if (e.key === "Enter") {
                 e.preventDefault();
-                place(cursor, placing ? undefined : (selected ?? undefined));
+                if (placing) place(cursor);
+                else if (selectedItem) place(cursor, selectedItem.id);
+                else setSelected(engine.hit(cursor.x, cursor.y, pickLayer === "all" ? undefined : Number(pickLayer))?.id ?? null);
               }
               if (e.key.toLowerCase() === "r") rotate();
-              if (e.key === "Escape") setSelected(null);
-              if (e.key === "Delete" && selected)
-                change(items.filter((i) => i.id !== selected));
+              if (e.key === "Escape") { setSelected(null); drag.current = null; }
+              if (e.key === "Delete" && selectedItem) { e.preventDefault(); removeSelected(); }
               if ((e.ctrlKey || e.metaKey) && e.key === "z") {
                 e.preventDefault();
                 e.shiftKey ? redo() : undo();
@@ -613,8 +639,12 @@ export function Office({
                 }
                 if (i) {
                   setSelected(i.id);
-                  drag.current = i.id;
+                  drag.current = { id: i.id, start: p, offset: { x: p.x - i.x, y: p.y - i.y } };
+                  setHint(`เลือกแล้ว: ${catalog[i.kind]?.name ?? i.kind}`);
                   canvas.current?.setPointerCapture(e.pointerId);
+                } else {
+                  setSelected(null);
+                  setHint("คลิกสิ่งของที่วางอยู่เพื่อเลือก");
                 }
               } else {
                 const a = agents.find((a) => {
@@ -652,11 +682,10 @@ export function Office({
                 return;
               }
               if (drag.current) {
-                const p = cell(e),
-                  old = items.find((i) => i.id === drag.current);
-                if (old && (old.x !== p.x || old.y !== p.y))
-                  place(p, drag.current);
+                const p = cell(e), movement = drag.current;
                 drag.current = null;
+                if (items.some(item => item.id === movement.id) && (p.x !== movement.start.x || p.y !== movement.start.y))
+                  place({ x: p.x - movement.offset.x, y: p.y - movement.offset.y }, movement.id);
               }
             }}
           />
@@ -692,28 +721,26 @@ export function Office({
             <button disabled={!future.current.length} onClick={redo}>
               ทำซ้ำ
             </button>
-            <button disabled={!selected} onClick={rotate}>
+            <button disabled={!selectedItem} onClick={rotate}>
               หมุน
             </button>
-            <button disabled={!selected} onClick={duplicate}>
+            <button disabled={!placing || !selectedItem} onClick={duplicate}>
               ทำสำเนา
             </button>
             <button
-              disabled={!selected}
-              onClick={() => {
-                change(items.filter((i) => i.id !== selected));
-                setSelected(null);
-              }}
+              disabled={!selectedItem}
+              onClick={removeSelected}
             >
-              ลบเฟอร์นิเจอร์
+              นำสิ่งของที่เลือกออก
             </button>
           </>
         )}
       </div>
       {edit && (
         <p className="muted">
-          คลิกเพื่อวาง · ลากเพื่อย้าย · ลูกศร + Enter วาง · R หมุน · Ctrl/⌘ Z
-          ย้อนกลับ · Esc ยกเลิกเลือก
+          {placing ? "คลิกช่องว่างเพื่อวางสิ่งของใหม่" : "คลิกสิ่งของเดิมเพื่อเลือก ลากเพื่อย้าย · คลิกพื้นว่างเพื่อยกเลิกเลือก"}
+          {selectedItem && ` · เลือกแล้ว: ${catalog[selectedItem.kind]?.name ?? selectedItem.kind}`}
+          {" · ลูกศร + Enter เลือก/ย้าย · R หมุน · Delete นำออก · Ctrl/⌘ Z ย้อนกลับ · Esc ยกเลิกเลือก"}
         </p>
       )}
       {hint && <p role="status">{hint}</p>}

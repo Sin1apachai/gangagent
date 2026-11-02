@@ -1486,3 +1486,9 @@ footer small {
   background: #253d36;
   color: #fff7e6;
 }
+
+.canvas-tools[aria-label="โหมดจัดวางสิ่งของ"] button[aria-pressed="true"] {
+  background: #253d36;
+  color: #fff7e6;
+  border-color: #253d36;
+}
