@@ -19,6 +19,13 @@ pub(crate) struct PlanStep {
     pub skill_ids: Vec<Uuid>,
     #[serde(default)]
     pub reviewer_id: Option<Uuid>,
+    #[serde(default = "owner_review")]
+    pub review_mode: String,
+    #[serde(default)]
+    pub review_agent_id: Option<Uuid>,
+}
+fn owner_review() -> String {
+    "owner".into()
 }
 pub(crate) struct PlanPolicy;
 impl PlanPolicy {
@@ -26,7 +33,10 @@ impl PlanPolicy {
         !steps.is_empty()
             && steps.len() <= 8
             && steps.iter().enumerate().all(|(index, s)| {
-                !s.title.trim().is_empty()
+                matches!(s.review_mode.as_str(), "owner" | "manager" | "agent")
+                    && (s.review_mode != "agent"
+                        || s.review_agent_id.is_some_and(|id| id != s.agent_id))
+                    && !s.title.trim().is_empty()
                     && s.title.len() <= 200
                     && s.description.len() <= 20000
                     && s.depends_on.iter().all(|&p| p < index)
@@ -81,6 +91,8 @@ mod tests {
             required_files: vec![],
             skill_ids: vec![],
             reviewer_id: None,
+            review_mode: "owner".into(),
+            review_agent_id: None,
         };
         assert!(!PlanPolicy::validate(&[s.clone()]));
         s.depends_on.clear();

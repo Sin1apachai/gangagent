@@ -47,6 +47,7 @@ export type Agent = {
   version: number;
 };
 export type Task = {
+  result_truncated?: boolean;
   context_format?: "compact" | "pretty" | "focused";
   quota_auto_resume?: boolean;
   quota_reset_at?: string | null;
@@ -66,6 +67,11 @@ export type Task = {
     workflow: import("../features/organization/types").Step | null;
   } | null;
   reviewer_id?: string | null;
+  review_mode?: "owner" | "manager" | "agent";
+  review_agent_id?: string | null;
+  review_for_task_id?: string | null;
+  review_state?: string;
+  review_note?: string;
   workflow_step?: import("../features/organization/types").Step | null;
   project_id?: string | null;
   priority?: string;

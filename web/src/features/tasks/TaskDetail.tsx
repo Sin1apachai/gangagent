@@ -1,4 +1,5 @@
-import { ArtifactPreview } from "./ArtifactPreview";
+import { TaskFiles } from "./TaskFiles";
+import { TaskHistory } from "./TaskHistory";
 import { TaskUsage } from "./TaskUsage";
 import { TaskQuota } from "../personnel/TaskQuota";
 import { TaskExecutionContext } from "./TaskExecutionContext";
@@ -88,6 +89,14 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
   useEffect(() => {
     setTaskTab(detail?.task.status === "review" ? "result" : "brief");
   }, [detail?.task.id]);
+  const resultPreview = Array.from(
+    (detail?.task.result || "")
+      .split(/\n\s*\n/)
+      .slice(0, 2)
+      .join("\n\n"),
+  )
+    .slice(0, 600)
+    .join("");
   if (!user) return null;
   return (
     <>
@@ -119,7 +128,8 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
               tabs={[
                 { id: "brief", label: "โจทย์และ Skill" },
                 { id: "result", label: "ผลงานและตรวจรับ" },
-                { id: "history", label: "ประวัติ" },
+                { id: "files", label: "ไฟล์ผลงาน" },
+                { id: "history", label: "ประวัติและบันทึก" },
                 { id: "usage", label: "การใช้ Token" },
               ]}
             />
@@ -228,8 +238,19 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
             >
               {detail.task.result && (
                 <>
-                  <h3>ผลงานล่าสุด</h3>
-                  <pre className="result">{detail.task.result}</pre>
+                  <h3>ข้อความช่วงต้นจาก Agent · รอบล่าสุด</h3>
+                  <pre className="result task-result-preview">
+                    {resultPreview}
+                  </pre>
+                  {(detail.task.result_truncated ||
+                    resultPreview !== detail.task.result) && (
+                    <button onClick={() => setTaskTab("history")}>
+                      อ่านข้อความทั้งหมดในบันทึก
+                    </button>
+                  )}
+                  <button onClick={() => setTaskTab("files")}>
+                    เปิดรายการไฟล์ผลงาน
+                  </button>
                   <p className="hint">
                     เมื่อตรวจรับ ระบบจะบันทึก Knowledge
                     ที่ตรวจสอบแล้วให้โดยอัตโนมัติ และเก็บประวัติก่อนอัปเดต
@@ -257,24 +278,44 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                   )}
                 </>
               )}
-              {detail.artifacts.some(
-                (f) => f.run_id === detail.runs[0]?.id,
-              ) && (
-                <>
-                  <h3>ไฟล์ผลงานล่าสุด</h3>
-                  {detail.artifacts
-                    .filter((f) => f.run_id === detail.runs[0]?.id)
-                    .map((f) => (
-                      <ArtifactPreview
-                        key={f.id}
-                        wid={wid!}
-                        taskId={detail.task.id}
-                        file={f}
-                      />
-                    ))}
-                </>
-              )}
+              {detail.task.review_mode !== "owner" &&
+                detail.task.review_mode && (
+                  <div className="review-box">
+                    <b>
+                      {detail.task.review_state === "needs_owner"
+                        ? "ต้องให้เจ้าของตัดสินใจ"
+                        : detail.task.review_state === "passed"
+                          ? "หัวหน้าตรวจผ่านแล้ว"
+                          : "ส่งให้ Agent ตรวจตาม Workflow"}
+                    </b>
+                    <p>
+                      ผู้ตรวจ:{" "}
+                      {data?.agents.find(
+                        (a) => a.id === detail.task.review_agent_id,
+                      )?.name || "เจ้าของรับช่วง"}
+                    </p>
+                    <p>{detail.task.review_note}</p>
+                    {data?.tasks
+                      .filter((t) => t.review_for_task_id === detail.task.id)
+                      .map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => run(() => showTask(t))}
+                        >
+                          เปิดงานตรวจ · {statusLabel[t.status]}
+                        </button>
+                      ))}
+                    {detail.task.review_state !== "needs_owner" &&
+                      detail.task.status === "review" && (
+                        <small>
+                          ระบบจะส่งต่อเมื่อหัวหน้าตรวจผ่าน
+                          คุณยังตรวจแทนได้หากจำเป็น
+                        </small>
+                      )}
+                  </div>
+                )}
               {detail.task.status === "review" &&
+                !detail.task.review_for_task_id &&
                 canWrite &&
                 (!detail.task.reviewer_id ||
                   detail.task.reviewer_id === user.id ||
@@ -333,39 +374,21 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
             </div>
             <div
               role="tabpanel"
-              aria-label="ประวัติ"
+              aria-label="ไฟล์ผลงาน"
+              hidden={taskTab !== "files"}
+            >
+              {taskTab === "files" && (
+                <TaskFiles key={detail.task.id} detail={detail} wid={wid!} />
+              )}
+            </div>
+            <div
+              role="tabpanel"
+              aria-label="ประวัติและบันทึก"
               hidden={taskTab !== "history"}
             >
-              <h3>ประวัติการทำงาน</h3>
-              {detail.events.map((e) => (
-                <p className="event" key={e.id}>
-                  <small>
-                    {new Date(e.created_at).toLocaleString("th-TH")}
-                  </small>{" "}
-                  {e.message}
-                </p>
-              ))}
-              {detail.runs.map((r) => (
-                <details key={r.id}>
-                  <summary>
-                    {statusLabel[r.status] ?? r.status} ·{" "}
-                    {new Date(r.started_at).toLocaleString("th-TH")}
-                  </summary>
-                  <pre className="result">
-                    {r.result || r.error || "กำลังทำงาน"}
-                  </pre>
-                  {detail.artifacts
-                    .filter((f) => f.run_id === r.id)
-                    .map((f) => (
-                      <ArtifactPreview
-                        key={f.id}
-                        wid={wid!}
-                        taskId={detail.task.id}
-                        file={f}
-                      />
-                    ))}
-                </details>
-              ))}
+              {taskTab === "history" && (
+                <TaskHistory key={detail.task.id} detail={detail} wid={wid!} />
+              )}
             </div>
           </section>
         </div>

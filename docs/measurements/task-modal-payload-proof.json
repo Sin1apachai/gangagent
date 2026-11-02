@@ -1,0 +1,8 @@
+{
+  "scope": "isolated fixture, task-detail HTTP response only",
+  "full_response_bytes": 73926,
+  "compact_response_bytes": 5659,
+  "reduction_percent": 92.35,
+  "background_task_results_excluded": true,
+  "model_calls": 0
+}

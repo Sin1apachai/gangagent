@@ -27,6 +27,7 @@ async fn validate_steps(
     steps: &[PlanStep],
 ) -> Result<()> {
     for step in steps {
+        crate::agent_review::resolve(tx, wid, step).await?;
         if let Some(reviewer) = step.reviewer_id {
             validate_reviewer(tx, wid, reviewer).await?;
         }

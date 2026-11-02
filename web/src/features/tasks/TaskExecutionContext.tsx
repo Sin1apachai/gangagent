@@ -67,7 +67,7 @@ export function TaskExecutionContext({ ctx }: { ctx: OfficeController }) {
         </>
       )}
       <p>
-        ผู้ตรวจรับ:{" "}
+        ผู้ใช้รับช่วง / ตรวจขั้นสุดท้าย:{" "}
         <b>
           {task.reviewer_id
             ? reviewers.find((r) => r.id === task.reviewer_id)?.name ||

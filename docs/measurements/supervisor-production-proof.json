@@ -1,0 +1,19 @@
+{
+  "schema": 24,
+  "production_health": "ok",
+  "matching_binaries": true,
+  "legacy_tasks_preserved": 7,
+  "workflow_template_version": 1,
+  "future_steps_with_agent_review": 5,
+  "future_steps_for_owner": 2,
+  "purchase_delivery_evidence": {
+    "assessment": "documents_only",
+    "code_files": 0,
+    "deliverable_files": 9,
+    "empty_compose_files": 1,
+    "message": "พบ Compose ที่ยังไม่มีบริการ จึงยังเปิดโปรแกรมจากไฟล์นี้ไม่ได้",
+    "runtime_verified": false
+  },
+  "compose_services_from_readonly_validation": 0,
+  "production_ai_runs_started_by_this_verification": 0
+}

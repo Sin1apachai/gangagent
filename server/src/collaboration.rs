@@ -181,6 +181,7 @@ async fn valid_agents(a: &App, wid: Uuid, steps: &[PlanStep]) -> Result<()> {
     }
     let mut tx = a.db.begin().await?;
     for step in steps {
+        crate::agent_review::resolve(&mut tx, wid, step).await?;
         if let Some(reviewer) = step.reviewer_id {
             organization::validate_reviewer(&mut tx, wid, reviewer).await?;
         }
@@ -270,7 +271,7 @@ async fn approve_plan(
         return Err(bad("Invalid plan steps"));
     }
     let mut ids: Vec<Uuid> = Vec::new();
-    for step in &steps {
+    for (index, step) in steps.iter().enumerate() {
         let provider: String = sqlx::query_scalar("SELECT provider FROM agents WHERE id=$1 AND workspace_id=$2 AND enabled AND deleted_at IS NULL")
             .bind(step.agent_id)
             .bind(wid)
@@ -284,6 +285,20 @@ async fn approve_plan(
         let tid = Uuid::new_v4();
         let reviewer = step.reviewer_id.unwrap_or(u.id);
         organization::validate_reviewer(&mut tx, wid, reviewer).await?;
+        let terminal = !steps.iter().any(|s| s.depends_on.contains(&index));
+        let review_agent = if terminal {
+            None
+        } else {
+            crate::agent_review::resolve(&mut tx, wid, step).await?
+        };
+        if let Some(agent) = review_agent {
+            let ready:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agents a JOIN provider_connections c ON c.provider=a.provider AND c.user_id=$1 WHERE a.id=$2 AND c.enabled AND c.billing_acknowledged AND NOT c.reauth_required)").bind(u.id).bind(agent).fetch_one(&mut *tx).await?;
+            if !ready {
+                return Err(bad(
+                    "Connect the reviewer provider before approving this plan",
+                ));
+            }
+        }
         let contract = json!(step);
         let context = organization::freeze_context(
             &mut tx,
@@ -294,6 +309,16 @@ async fn approve_plan(
         )
         .await?;
         sqlx::query("INSERT INTO tasks(id,workspace_id,created_by,title,description,provider,agent_id,plan_id,execution_requested,execution_context,reviewer_id,workflow_step,acceptance_criteria,context_format) VALUES($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13)").bind(tid).bind(wid).bind(u.id).bind(&step.title).bind(&step.description).bind(provider).bind(step.agent_id).bind(id).bind(context).bind(reviewer).bind(contract).bind(&step.acceptance_criteria).bind(b.context_format.as_deref().unwrap_or("compact")).execute(&mut *tx).await?;
+        sqlx::query("UPDATE tasks SET review_mode=$1,review_agent_id=$2 WHERE id=$3")
+            .bind(if terminal {
+                "owner"
+            } else {
+                step.review_mode.as_str()
+            })
+            .bind(review_agent)
+            .bind(tid)
+            .execute(&mut *tx)
+            .await?;
         for &parent in &step.depends_on {
             sqlx::query("INSERT INTO task_dependencies VALUES($1,$2)")
                 .bind(tid)

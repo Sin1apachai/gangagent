@@ -36,10 +36,19 @@ pub(crate) async fn snapshot(
     State(a): State<App>,
     h: HeaderMap,
     Path(id): Path<Uuid>,
+    axum::extract::Query(q): axum::extract::Query<crate::task_logs::DetailQuery>,
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
     access(&a, &u, id, false).await?;
-    let value:Value=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'version',version,'agents',COALESCE((SELECT json_agg(a ORDER BY a.created_at) FROM agents a WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'layout',layout,'layout_version',layout_version,'tasks',COALESCE((SELECT json_agg(t ORDER BY t.created_at DESC) FROM tasks t WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'knowledge',COALESCE((SELECT json_agg(k ORDER BY k.created_at DESC) FROM knowledge k WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json)) FROM workspaces w WHERE id=$1").bind(id).fetch_one(&a.db).await?;
+    let mut value:Value=sqlx::query_scalar("SELECT json_build_object('id',id,'name',name,'version',version,'agents',COALESCE((SELECT json_agg(a ORDER BY a.created_at) FROM agents a WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'layout',layout,'layout_version',layout_version,'tasks',COALESCE((SELECT json_agg(t ORDER BY t.created_at DESC) FROM tasks t WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json),'knowledge',COALESCE((SELECT json_agg(k ORDER BY k.created_at DESC) FROM knowledge k WHERE workspace_id=w.id AND deleted_at IS NULL),'[]'::json)) FROM workspaces w WHERE id=$1").bind(id).fetch_one(&a.db).await?;
+    if q.compact {
+        if let Some(tasks) = value["tasks"].as_array_mut() {
+            for task in tasks {
+                task["result"] = json!("");
+                task["execution_context"] = Value::Null;
+            }
+        }
+    }
     Ok(Json(value))
 }
 #[derive(Deserialize)]

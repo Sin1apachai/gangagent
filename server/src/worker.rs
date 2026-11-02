@@ -406,7 +406,11 @@ async fn prepare_inputs(db: &PgPool, j: &Job, dir: &FsPath) -> WorkerResult<()> 
         #[cfg(unix)]
         std::os::unix::fs::chown(&path, Some(model_uid()), Some(model_uid()))?;
     }
-    let parents:Vec<(Uuid,Uuid)>=sqlx::query_as("SELECT t.id,t.current_run_id FROM task_dependencies d JOIN tasks t ON t.id=d.depends_on WHERE d.task_id=$1 AND t.workspace_id=$2 AND t.status='done' AND t.deleted_at IS NULL AND t.current_run_id IS NOT NULL LIMIT 8").bind(j.id).bind(j.workspace_id).fetch_all(db).await?;
+    let mut parents:Vec<(Uuid,Uuid)>=sqlx::query_as("SELECT t.id,t.current_run_id FROM task_dependencies d JOIN tasks t ON t.id=d.depends_on WHERE d.task_id=$1 AND t.workspace_id=$2 AND t.status='done' AND t.deleted_at IS NULL AND t.current_run_id IS NOT NULL LIMIT 8").bind(j.id).bind(j.workspace_id).fetch_all(db).await?;
+    let review_source:Option<(Uuid,Uuid)>=sqlx::query_as("SELECT t.id,t.current_run_id FROM tasks review JOIN tasks t ON t.id=review.review_for_task_id AND t.current_run_id=review.review_source_run_id WHERE review.id=$1 AND t.workspace_id=$2 AND t.status='review' AND t.deleted_at IS NULL").bind(j.id).bind(j.workspace_id).fetch_optional(db).await?;
+    if let Some(source) = review_source {
+        parents.push(source);
+    }
     for (parent, run) in parents {
         let files: Vec<(String, i64)> = sqlx::query_as(
             "SELECT name,size FROM artifacts WHERE task_id=$1 AND run_id=$2 LIMIT 101",
@@ -622,8 +626,18 @@ async fn execute(
     .execute(db)
     .await?;
     if fixture {
+        if j.description.contains("[test:many-events]") {
+            for i in 0..45 {
+                phase2::event(db, j.id, Some(run), &format!("Fixture event {i}")).await?;
+            }
+        }
         let start = Instant::now();
-        let duration = if j.description.contains("[test:slow]") {
+        let duration = if j.description.contains("[test:slow]")
+            || (j.description.contains("[test:review-slow]")
+                && j.execution_context
+                    .as_ref()
+                    .is_some_and(|c| c.get("agent_review").is_some()))
+        {
             10.0
         } else {
             0.3
@@ -678,6 +692,51 @@ async fn execute(
                 }
                 tokio::fs::write(source, "REVISED_FILE_CONTENT").await?;
             }
+        }
+        if let Some(review) = j
+            .execution_context
+            .as_ref()
+            .and_then(|c| c.get("agent_review"))
+        {
+            if j.description.contains("[test:review-quota]") {
+                let prior: i64 = sqlx::query_scalar(
+                    "SELECT count(*) FROM task_runs WHERE task_id=$1 AND status='waiting_quota'",
+                )
+                .bind(j.id)
+                .fetch_one(db)
+                .await?;
+                if prior == 0 {
+                    let reset = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)?
+                        .as_secs()
+                        + 3;
+                    return Ok((
+                        "waiting_quota".into(),
+                        String::new(),
+                        format!("Provider quota reached; reset_at={reset}"),
+                    ));
+                }
+            }
+            let decision = if j.description.contains("[test:review-always-revise]")
+                || (j.description.contains("[test:review-revise]")
+                    && review["attempt"].as_i64() == Some(1))
+            {
+                "revise"
+            } else if j.description.contains("[test:review-escalate]") {
+                "escalate"
+            } else {
+                "pass"
+            };
+            let report = json!({"source_run_id":review["source_run_id"],"decision":decision,"reason":"Fixture evidence checked against acceptance criteria","evidence":[format!("inputs/{}/result.md",review["task_id"].as_str().unwrap())],"findings":if decision=="revise"{vec!["Correct fixture defect"]}else{vec![]}});
+            tokio::fs::write(
+                dir.join("review-decision.json"),
+                if j.description.contains("[test:review-invalid]") {
+                    b"{}".to_vec()
+                } else {
+                    serde_json::to_vec(&report)?
+                },
+            )
+            .await?;
         }
         if j.description.contains("[test:knowledge-doc]") {
             tokio::fs::write(
@@ -948,7 +1007,7 @@ async fn finish(
         }
     }
     let mut tx = db.begin().await?;
-    let n=sqlx::query("UPDATE tasks SET status=$1,result=$2,error=$3,execution_requested=false,cancel_requested=false,lease_until=NULL,version=version+1 WHERE id=$4 AND current_run_id=$5 AND status='running'").bind(status).bind(result).bind(error).bind(j.id).bind(run).execute(&mut *tx).await?.rows_affected();
+    let n=sqlx::query("UPDATE tasks SET status=$1,result=$2,error=$3,execution_requested=false,cancel_requested=false,lease_until=NULL,review_state='',review_note='',version=version+1 WHERE id=$4 AND current_run_id=$5 AND status='running'").bind(status).bind(result).bind(error).bind(j.id).bind(run).execute(&mut *tx).await?.rows_affected();
     if n > 0 {
         if status == "waiting_quota" {
             quota::waiting(&mut tx, j.id, error).await?;

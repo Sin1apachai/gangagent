@@ -269,7 +269,53 @@ export function StepEditor({
                   </small>
                 </label>
                 <label>
-                  ผู้ตรวจรับ
+                  วิธีตรวจงาน
+                  <select
+                    disabled={disabled}
+                    value={s.review_mode || "owner"}
+                    onChange={(e) =>
+                      change(i, {
+                        review_mode: e.target.value as Step["review_mode"],
+                        review_agent_id: null,
+                      })
+                    }
+                  >
+                    <option value="manager">
+                      หัวหน้าใน Org Chart ตรวจอัตโนมัติ
+                    </option>
+                    <option value="agent">เลือก Agent ผู้ตรวจ</option>
+                    <option value="owner">ให้เจ้าของ / ผู้ใช้ตรวจ</option>
+                  </select>
+                  <small>
+                    หัวหน้าส่งแก้ได้จนถึงขีดจำกัด 3 รอบ
+                    แล้วส่งให้เจ้าของตัดสินใจ งานปลายทางให้เจ้าของตรวจเสมอ
+                    หากไม่มีหัวหน้าจะส่งให้เจ้าของ
+                  </small>
+                </label>
+                {s.review_mode === "agent" && (
+                  <label>
+                    Agent ผู้ตรวจ
+                    <select
+                      disabled={disabled}
+                      required
+                      value={s.review_agent_id || ""}
+                      onChange={(e) =>
+                        change(i, { review_agent_id: e.target.value || null })
+                      }
+                    >
+                      <option value="">เลือกผู้ตรวจที่ไม่ใช่ผู้ทำงาน</option>
+                      {agents
+                        .filter((a) => a.id !== s.agent_id && a.enabled)
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} · {a.role}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+                <label>
+                  ผู้ใช้รับช่วงเมื่อ Agent ตรวจไม่ได้
                   <select
                     disabled={disabled}
                     value={s.reviewer_id || ""}

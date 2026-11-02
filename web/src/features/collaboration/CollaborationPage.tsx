@@ -1,3 +1,4 @@
+import { DeliveryEvidence } from "./DeliveryEvidence";
 import { ProjectsPanel, type Project } from "./ProjectsPanel";
 import { FormTabs } from "../../shared/FormTabs";
 import { planReadiness } from "./planReadiness";
@@ -90,7 +91,7 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
           <header className="plans-heading">
             <div>
               <h2>แผนงานของทีม</h2>
-              <p>ตรวจแผนก่อนเริ่ม แล้วติดตามงานและตรวจรับทีละขั้น</p>
+              <p>กำหนดหัวหน้าตรวจงานภายใน แล้วตรวจรับผลงานปลายทาง</p>
             </div>
             {canWrite && (
               <div className="plans-toolbar">
@@ -192,7 +193,9 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                 agents.map((a) => a.id),
                 !!drafts[p.id],
               );
-              const tasks = data.tasks.filter((t) => t.plan_id === p.id),
+              const tasks = data.tasks.filter(
+                  (t) => t.plan_id === p.id && !t.review_for_task_id,
+                ),
                 done = tasks.filter((t) => t.status === "done").length,
                 review = tasks.filter((t) => t.status === "review").length;
               return (
@@ -217,9 +220,16 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         ? `เสร็จ ${done}/${tasks.length} งาน`
                         : "ยังไม่เริ่มงาน AI"}
                     </span>
-                    {review > 0 && <strong>รอคุณตรวจรับ {review} งาน</strong>}
+                    {review > 0 && (
+                      <strong>
+                        อยู่ระหว่างตรวจ {review} งาน · ดูผู้ตรวจในรายละเอียด
+                      </strong>
+                    )}
                     {drafts[p.id] && <strong>มีการแก้ไขที่ยังไม่บันทึก</strong>}
                   </div>
+                  {p.status !== "draft" && (
+                    <DeliveryEvidence wid={wid!} id={p.id} />
+                  )}
                   <p className="plan-next" role="status">
                     {p.status === "draft"
                       ? drafts[p.id]
@@ -232,7 +242,7 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         : review
                           ? "ขั้นต่อไป: เปิดงานที่รอตรวจรับ เพื่ออ่านผลและรับงานหรือส่งแก้"
                           : done === tasks.length && tasks.length
-                            ? "ทุกงานในแผนเสร็จแล้ว ตรวจผลงานได้ในแท็บติดตามงาน"
+                            ? "ตรวจรับครบแล้ว · เปิดหลักฐานส่งมอบเพื่อตรวจว่ามีโปรแกรมและผลทดสอบจริงหรือยัง"
                             : "แผนเริ่มแล้ว ดูสถานะและสิ่งที่ต้องทำต่อในแท็บติดตามงาน"}
                   </p>
                   <FormTabs
@@ -406,7 +416,8 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         </p>
                         <p>
                           เมื่อเริ่ม ระบบใช้โควตา AI ของบัญชีที่เชื่อมไว้
-                          งานถัดไปรอให้คุณตรวจรับงานที่เกี่ยวข้องก่อน
+                          งานถัดไปรอผู้ตรวจตาม Workflow
+                          งานปลายทางให้เจ้าของตรวจรับ
                         </p>
                       </div>
                       <details className="plan-context-settings">
@@ -437,7 +448,8 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                             }))
                           }
                         />
-                        ฉันตรวจแผนแล้ว และอนุญาตให้ใช้โควตาสมาชิกตามงานในแผน
+                        ฉันตรวจแผนแล้ว และอนุญาตให้ใช้โควตาสมาชิกทั้งงานผลิต
+                        งานตรวจโดย Agent และการส่งแก้ตามขีดจำกัด
                       </label>
                       <button
                         className="primary"
@@ -508,7 +520,13 @@ export function CollaborationPage({ ctx }: { ctx: OfficeController }) {
                         .map((t) => (
                           <div className="list-row" key={t.id}>
                             <span>
+                              {t.review_for_task_id ? "งานตรวจ · " : ""}
                               {t.title} · {statusLabel[t.status]}
+                              {t.review_state === "waiting_agent"
+                                ? " · รอหัวหน้าตรวจ"
+                                : t.review_state === "needs_owner"
+                                  ? " · ต้องให้เจ้าของตัดสินใจ"
+                                  : ""}
                               {t.status === "queued"
                                 ? " · รอตรวจรับงานก่อนหน้าหรือรอเครื่อง"
                                 : ""}

@@ -8,6 +8,8 @@ export function nextStep(steps: Step[]): Step {
     skill_ids: [],
     required_files: [],
     reviewer_id: null,
+    review_mode: "manager",
+    review_agent_id: null,
     input_contract: "",
     output_contract: "",
     acceptance_criteria: "",

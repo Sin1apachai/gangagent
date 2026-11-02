@@ -1,3 +1,4 @@
+import { ReviewInbox } from "./features/tasks/ReviewInbox";
 import { useResourceMonitor } from "./features/monitoring/useResourceMonitor";
 import { ResourceBell } from "./features/monitoring/ResourceBell";
 import { PersonnelPage } from "./features/personnel/PersonnelPage";
@@ -250,6 +251,7 @@ export default function App() {
             {data?.name ?? (wid ? "กำลังโหลด…" : "ยังไม่มี Workspace")}
           </div>
           <div className="header-right">
+            <ReviewInbox ctx={controller} />
             {user.is_super_admin && (
               <ResourceBell
                 monitor={resourceMonitor}

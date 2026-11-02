@@ -22,6 +22,8 @@ export type Step = {
   required_files?: string[];
   skill_ids?: string[];
   reviewer_id?: string | null;
+  review_mode?: "owner" | "manager" | "agent";
+  review_agent_id?: string | null;
 };
 export type Workflow = {
   id: string;
@@ -49,6 +51,8 @@ export const emptyStep = (): Step => ({
   skill_ids: [],
   required_files: [],
   reviewer_id: null,
+  review_mode: "manager",
+  review_agent_id: null,
   input_contract: "",
   output_contract: "",
   acceptance_criteria: "",

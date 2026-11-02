@@ -1,9 +1,11 @@
 mod admin;
+mod agent_review;
 mod application;
 mod auth;
 mod backup;
 mod collaboration;
 mod context_engine;
+mod delivery_evidence;
 mod domain;
 mod infrastructure;
 mod knowledge_memory;
@@ -21,6 +23,7 @@ use auth::*;
 use workspaces::*;
 mod phase2;
 mod provider_login;
+mod task_logs;
 mod usage;
 mod worker;
 use argon2::{
@@ -138,6 +141,7 @@ pub async fn run() {
     personal_workers::reconcile(app.clone());
     quota::scheduler(app.db.clone());
     monitoring::start(app.clone());
+    agent_review::start(app.clone());
     let api = Router::new()
         .route("/health", get(health))
         .route("/auth/login", post(login))
@@ -156,6 +160,8 @@ pub async fn run() {
                 .merge(model_selection::routes())
                 .merge(master_data::routes())
                 .merge(knowledge_memory::routes())
+                .merge(delivery_evidence::routes())
+                .merge(task_logs::routes())
                 .merge(recruitment::routes())
                 .merge(quota::routes())
                 .merge(context_engine::routes())

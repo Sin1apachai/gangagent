@@ -74,7 +74,7 @@ pub(crate) async fn edit_task(
     let u = user(&a, &h).await?;
     access(&a, &u, wid, true).await?;
     check_task(&a, wid, &b).await?;
-    let n=sqlx::query("UPDATE tasks SET title=$1,description=$2,provider=$3,agent_id=$4,project_id=$8,priority=$9,acceptance_criteria=$10,version=version+1 WHERE id=$5 AND workspace_id=$6 AND version=$7 AND deleted_at IS NULL AND status!='running' AND NOT execution_requested AND workflow_step IS NULL AND (execution_context IS NULL OR (provider=$3 AND agent_id IS NOT DISTINCT FROM $4))").bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).execute(&a.db).await?.rows_affected();
+    let n=sqlx::query("UPDATE tasks SET title=$1,description=$2,provider=$3,agent_id=$4,project_id=$8,priority=$9,acceptance_criteria=$10,version=version+1 WHERE id=$5 AND workspace_id=$6 AND version=$7 AND deleted_at IS NULL AND status!='running' AND NOT execution_requested AND workflow_step IS NULL AND review_for_task_id IS NULL AND (execution_context IS NULL OR (provider=$3 AND agent_id IS NOT DISTINCT FROM $4))").bind(b.title.trim()).bind(b.description).bind(b.provider).bind(b.agent_id).bind(id).bind(wid).bind(b.version.ok_or(bad("Version required"))?).bind(b.project_id).bind(b.priority).bind(b.acceptance_criteria).execute(&a.db).await?.rows_affected();
     audit(&a, &u, Some(wid), "task.updated").await?;
     changed(n)
 }
@@ -82,10 +82,27 @@ pub(crate) async fn task_detail(
     State(a): State<App>,
     h: HeaderMap,
     Path((wid, id)): Path<(Uuid, Uuid)>,
+    axum::extract::Query(q): axum::extract::Query<crate::task_logs::DetailQuery>,
 ) -> Result<Json<Value>> {
     let u = user(&a, &h).await?;
     access(&a, &u, wid, false).await?;
     let v=sqlx::query_scalar("SELECT json_build_object('task',row_to_json(t),'events',COALESCE((SELECT json_agg(e ORDER BY e.id) FROM task_events e WHERE task_id=t.id),'[]'::json),'runs',COALESCE((SELECT json_agg(json_build_object('id',r.id,'status',r.status,'started_at',r.started_at,'finished_at',r.finished_at,'usage_metrics',r.usage_metrics,'result',r.result,'error',r.error) ORDER BY started_at DESC) FROM task_runs r WHERE task_id=t.id),'[]'::json),'artifacts',COALESCE((SELECT json_agg(a) FROM artifacts a WHERE task_id=t.id),'[]'::json)) FROM tasks t WHERE workspace_id=$1 AND id=$2 AND deleted_at IS NULL").bind(wid).bind(id).fetch_optional(&a.db).await?.ok_or(Error(StatusCode::NOT_FOUND,"Task not found"))?;
+    let mut v: Value = v;
+    if q.compact {
+        let text = v["task"]["result"].as_str().unwrap_or("");
+        let trimmed = text.chars().take(2000).collect::<String>();
+        v["task"]["result_truncated"] = json!(trimmed.len() < text.len());
+        v["task"]["result"] = json!(trimmed);
+        v["events"] = json!([]);
+        if let Some(runs) = v["runs"].as_array_mut() {
+            for run in runs {
+                if let Some(row) = run.as_object_mut() {
+                    row.remove("result");
+                    row.remove("error");
+                }
+            }
+        }
+    }
     Ok(Json(v))
 }
 #[derive(Deserialize)]
@@ -172,7 +189,7 @@ pub(crate) async fn review_task(
             }
         }
     }
-    let n=sqlx::query("UPDATE tasks SET status=$1,review_feedback=$2,execution_requested=false,version=version+1 WHERE workspace_id=$3 AND id=$4 AND status='review' AND deleted_at IS NULL AND ($1='done' OR attempts<3)").bind(if b.accept{"done"}else{"queued"}).bind(&b.feedback).bind(wid).bind(id).execute(&mut *tx).await?.rows_affected();
+    let n=sqlx::query("UPDATE tasks SET status=$1,review_feedback=$2,execution_requested=false,version=version+1 WHERE workspace_id=$3 AND id=$4 AND status='review' AND review_for_task_id IS NULL AND deleted_at IS NULL AND ($1='done' OR attempts<3)").bind(if b.accept{"done"}else{"queued"}).bind(&b.feedback).bind(wid).bind(id).execute(&mut *tx).await?.rows_affected();
     let knowledge = if n > 0 && b.accept {
         Some(crate::knowledge_memory::save(&mut tx, wid, id, u.id).await?)
     } else {

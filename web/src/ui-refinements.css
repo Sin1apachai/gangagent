@@ -1310,3 +1310,75 @@ footer small {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.review-inbox {
+  position: relative;
+}
+.review-inbox-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(380px, calc(100vw - 32px));
+  max-height: 65vh;
+  overflow: auto;
+  z-index: 70;
+  padding: 16px;
+  border: 2px solid var(--ink, #29251e);
+  background: var(--paper, #faf6e9);
+  box-shadow: 4px 4px 0 #29251e;
+}
+.review-inbox-panel p {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.review-inbox-panel button {
+  text-align: left;
+  white-space: normal;
+}
+
+.task-files,
+.task-history {
+  display: grid;
+  gap: 16px;
+}
+.task-file-row {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid #d5ccb7;
+  padding: 10px 0;
+  min-width: 0;
+}
+.task-file-row > small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.task-history .result {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.modal.task-detail {
+  width: min(960px, calc(100vw - 32px));
+  max-width: 960px;
+}
+.task-detail > .form-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: visible;
+}
+.task-detail > .form-tabs button {
+  white-space: normal;
+  padding: 10px 8px;
+}
+.task-detail .task-result-preview {
+  max-height: 200px;
+}
+@media (max-width: 600px) {
+  .task-detail > .form-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

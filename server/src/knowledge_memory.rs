@@ -45,7 +45,7 @@ pub(crate) async fn save(
     task: Uuid,
     uid: Uuid,
 ) -> Result<Saved> {
-    let (title,result,project,plan,run,contract):(String,String,Option<Uuid>,Option<Uuid>,Option<Uuid>,Option<Value>)=sqlx::query_as("SELECT title,result,project_id,plan_id,current_run_id,workflow_step FROM tasks WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL AND status='done'").bind(task).bind(wid).fetch_optional(&mut **tx).await?.ok_or(bad("Accept the task before saving automatic knowledge"))?;
+    let (title,result,project,plan,run,contract):(String,String,Option<Uuid>,Option<Uuid>,Option<Uuid>,Option<Value>)=sqlx::query_as("SELECT title,result,project_id,plan_id,current_run_id,workflow_step FROM tasks WHERE id=$1 AND workspace_id=$2 AND deleted_at IS NULL AND status='done' AND review_for_task_id IS NULL").bind(task).bind(wid).fetch_optional(&mut **tx).await?.ok_or(bad("Accept the task before saving automatic knowledge"))?;
     let run = run.ok_or(bad("Accepted task has no source run"))?;
     let names: Vec<String> = sqlx::query_scalar(
         "SELECT name FROM artifacts WHERE task_id=$1 AND run_id=$2 ORDER BY name",

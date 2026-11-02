@@ -67,7 +67,7 @@ export function useOfficeController() {
   async function refresh() {
     const id = active.current;
     if (!id) return;
-    const d = await api<Snapshot>("/workspaces/" + id);
+    const d = await api<Snapshot>("/workspaces/" + id + "?compact=true");
     if (active.current === id) {
       setData(d);
       if (!edit) {
@@ -101,7 +101,9 @@ export function useOfficeController() {
     if (detail) {
       try {
         setDetail(
-          await api<Detail>(`/workspaces/${wid}/tasks/${detail.task.id}`),
+          await api<Detail>(
+            `/workspaces/${wid}/tasks/${detail.task.id}?compact=true`,
+          ),
         );
       } catch {
         setDetail(null);
@@ -124,7 +126,7 @@ export function useOfficeController() {
     setOrgAgentId(null);
     setDetail(null);
     if (wid)
-      api<Snapshot>("/workspaces/" + wid)
+      api<Snapshot>("/workspaces/" + wid + "?compact=true")
         .then((d) => {
           if (active.current === wid) {
             setData(d);
@@ -146,7 +148,7 @@ export function useOfficeController() {
           .then(setConnections)
           .catch(() => {});
         if (detail)
-          api<Detail>(`/workspaces/${wid}/tasks/${detail.task.id}`)
+          api<Detail>(`/workspaces/${wid}/tasks/${detail.task.id}?compact=true`)
             .then(setDetail)
             .catch(() => {});
       }
@@ -195,7 +197,9 @@ export function useOfficeController() {
     setMessage("ส่งคำขอเริ่มงานแล้ว Worker จะตรวจ Login ก่อนทำงาน");
   }
   async function showTask(t: Task) {
-    setDetail(await api<Detail>(`/workspaces/${wid}/tasks/${t.id}`));
+    setDetail(
+      await api<Detail>(`/workspaces/${wid}/tasks/${t.id}?compact=true`),
+    );
   }
   const fixture = connections?.workers.some(
     (w) => w.online && w.mode === "fixture",
