@@ -102,6 +102,14 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
     .slice(0, 600)
     .join("");
   if (!user) return null;
+  const canReview =
+    !!detail &&
+    detail.task.status === "review" &&
+    !detail.task.review_for_task_id &&
+    canWrite &&
+    (!detail.task.reviewer_id ||
+      detail.task.reviewer_id === user.id ||
+      canManage);
   return (
     <>
       {detail && (
@@ -176,79 +184,6 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 {detail.task.error && (
                   <p className="error">{detail.task.error}</p>
                 )}
-                <div className="actions">
-                  {canWrite &&
-                    !detail.task.workflow_step &&
-                    detail.task.status !== "running" && (
-                      <button
-                        onClick={() => {
-                          setModal({ kind: "task", value: detail.task });
-                          setDetail(null);
-                        }}
-                      >
-                        แก้ไข
-                      </button>
-                    )}
-                  {canWrite &&
-                    detail.task.created_by === user.id &&
-                    [
-                      "queued",
-                      "failed",
-                      "cancelled",
-                      "waiting_auth",
-                      "waiting_quota",
-                      "interrupted",
-                    ].includes(detail.task.status) && (
-                      <button
-                        className="primary"
-                        disabled={
-                          busy ||
-                          detail.task.execution_requested ||
-                          detail.task.attempts >= 3
-                        }
-                        onClick={() => run(() => start(detail.task))}
-                      >
-                        เริ่ม / ลองใหม่
-                      </button>
-                    )}
-                  {canWrite &&
-                    [
-                      "queued",
-                      "running",
-                      "waiting_auth",
-                      "waiting_quota",
-                      "interrupted",
-                    ].includes(detail.task.status) && (
-                      <button
-                        disabled={busy || detail.task.cancel_requested}
-                        onClick={() =>
-                          run(async () => {
-                            await api(
-                              `/workspaces/${wid}/tasks/${detail.task.id}/cancel`,
-                              {},
-                            );
-                            await after();
-                          })
-                        }
-                      >
-                        {detail.task.cancel_requested
-                          ? "กำลังยกเลิก…"
-                          : "ยกเลิกงาน"}
-                      </button>
-                    )}
-                  {canWrite && detail.task.status !== "running" && (
-                    <button
-                      onClick={() =>
-                        setModal({
-                          kind: "delete",
-                          value: { kind: "tasks", item: detail.task },
-                        })
-                      }
-                    >
-                      ลบงาน
-                    </button>
-                  )}
-                </div>
               </div>
               <div
                 role="tabpanel"
@@ -274,27 +209,6 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                       เมื่อตรวจรับ ระบบจะบันทึก Knowledge
                       ที่ตรวจสอบแล้วให้โดยอัตโนมัติ และเก็บประวัติก่อนอัปเดต
                     </p>
-                    {detail.task.status === "done" && canWrite && (
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          run(async () => {
-                            const saved = await api<{ action: string }>(
-                              `/workspaces/${wid}/tasks/${detail.task.id}/knowledge`,
-                              {},
-                            );
-                            await after();
-                            setMessage(
-                              saved.action === "unchanged"
-                                ? "Knowledge เป็นข้อมูลล่าสุดแล้ว"
-                                : "บันทึก Knowledge จากงานที่ตรวจรับแล้ว",
-                            );
-                          })
-                        }
-                      >
-                        ซิงก์ Knowledge จากงานนี้
-                      </button>
-                    )}
                   </>
                 )}
                 {detail.task.review_mode !== "owner" &&
@@ -333,65 +247,44 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                         )}
                     </div>
                   )}
-                {detail.task.status === "review" &&
-                  !detail.task.review_for_task_id &&
-                  canWrite &&
-                  (!detail.task.reviewer_id ||
-                    detail.task.reviewer_id === user.id ||
-                    canManage) && (
-                    <form
-                      className="review-box"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const submitter = (e.nativeEvent as SubmitEvent)
-                          .submitter as HTMLButtonElement;
-                        const accept = submitter.value === "accept";
-                        const feedback = String(
-                          new FormData(e.currentTarget).get("feedback") ?? "",
+                {canReview && (
+                  <form
+                    id="task-review-form"
+                    className="review-box"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const submitter = (e.nativeEvent as SubmitEvent)
+                        .submitter as HTMLButtonElement;
+                      const accept = submitter.value === "accept";
+                      const feedback = String(
+                        new FormData(e.currentTarget).get("feedback") ?? "",
+                      );
+                      run(async () => {
+                        const result = await api<{
+                          knowledge?: { action: string };
+                        }>(
+                          `/workspaces/${wid}/tasks/${detail.task.id}/review`,
+                          { accept, feedback },
                         );
-                        run(async () => {
-                          const result = await api<{
-                            knowledge?: { action: string };
-                          }>(
-                            `/workspaces/${wid}/tasks/${detail.task.id}/review`,
-                            { accept, feedback },
+                        await after();
+                        if (accept)
+                          setMessage(
+                            result.knowledge?.action === "updated"
+                              ? "ตรวจรับแล้ว · อัปเดต Knowledge และเก็บประวัติเดิมแล้ว"
+                              : result.knowledge?.action === "unchanged"
+                                ? "ตรวจรับแล้ว · Knowledge เป็นข้อมูลล่าสุดแล้ว"
+                                : "ตรวจรับแล้ว · สร้าง Knowledge ให้เรียบร้อยแล้ว",
                           );
-                          await after();
-                          if (accept)
-                            setMessage(
-                              result.knowledge?.action === "updated"
-                                ? "ตรวจรับแล้ว · อัปเดต Knowledge และเก็บประวัติเดิมแล้ว"
-                                : result.knowledge?.action === "unchanged"
-                                  ? "ตรวจรับแล้ว · Knowledge เป็นข้อมูลล่าสุดแล้ว"
-                                  : "ตรวจรับแล้ว · สร้าง Knowledge ให้เรียบร้อยแล้ว",
-                            );
-                        });
-                      }}
-                    >
-                      <Area
-                        label="ความคิดเห็น / สิ่งที่ต้องแก้"
-                        name="feedback"
-                      />
-                      <div className="actions">
-                        <button
-                          className="primary"
-                          value="accept"
-                          disabled={busy}
-                        >
-                          ตรวจรับและบันทึก Knowledge
-                        </button>
-                        <button
-                          value="revise"
-                          disabled={busy || detail.task.attempts >= 3}
-                        >
-                          ส่งกลับแก้ไข
-                        </button>
-                      </div>
-                      <small>
-                        งานที่ส่งแก้ต้องกดเริ่มใหม่ ไม่รันวนอัตโนมัติ
-                      </small>
-                    </form>
-                  )}
+                      });
+                    }}
+                  >
+                    <Area
+                      label="ความคิดเห็น / สิ่งที่ต้องแก้"
+                      name="feedback"
+                    />
+                    <small>งานที่ส่งแก้ต้องกดเริ่มใหม่ ไม่รันวนอัตโนมัติ</small>
+                  </form>
+                )}
               </div>
               <div
                 role="tabpanel"
@@ -416,6 +309,134 @@ export function TaskDetail({ ctx }: { ctx: OfficeController }) {
                 )}
               </div>
             </div>
+            <footer
+              className="task-modal-footer"
+              aria-label="การดำเนินการของงาน"
+            >
+              <div className="actions">
+                {canWrite &&
+                  !detail.task.workflow_step &&
+                  !detail.task.review_for_task_id &&
+                  detail.task.status !== "running" && (
+                    <button
+                      onClick={() => {
+                        setModal({ kind: "task", value: detail.task });
+                        setDetail(null);
+                      }}
+                    >
+                      แก้ไข
+                    </button>
+                  )}
+                {canWrite &&
+                  detail.task.created_by === user.id &&
+                  [
+                    "queued",
+                    "failed",
+                    "cancelled",
+                    "waiting_auth",
+                    "waiting_quota",
+                    "interrupted",
+                  ].includes(detail.task.status) && (
+                    <button
+                      className="primary"
+                      disabled={
+                        busy ||
+                        detail.task.execution_requested ||
+                        detail.task.attempts >= 3
+                      }
+                      onClick={() => run(() => start(detail.task))}
+                    >
+                      เริ่ม / ลองใหม่
+                    </button>
+                  )}
+                {canWrite &&
+                  [
+                    "queued",
+                    "running",
+                    "waiting_auth",
+                    "waiting_quota",
+                    "interrupted",
+                  ].includes(detail.task.status) && (
+                    <button
+                      disabled={busy || detail.task.cancel_requested}
+                      onClick={() =>
+                        run(async () => {
+                          await api(
+                            `/workspaces/${wid}/tasks/${detail.task.id}/cancel`,
+                            {},
+                          );
+                          await after();
+                        })
+                      }
+                    >
+                      {detail.task.cancel_requested
+                        ? "กำลังยกเลิก…"
+                        : "ยกเลิกงาน"}
+                    </button>
+                  )}
+                {canWrite && detail.task.status !== "running" && (
+                  <button
+                    onClick={() =>
+                      setModal({
+                        kind: "delete",
+                        value: { kind: "tasks", item: detail.task },
+                      })
+                    }
+                  >
+                    ลบงาน
+                  </button>
+                )}
+              </div>
+              <div className="task-footer-primary">
+                {detail.task.status === "done" &&
+                  !detail.task.review_for_task_id &&
+                  canWrite && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        run(async () => {
+                          const saved = await api<{ action: string }>(
+                            `/workspaces/${wid}/tasks/${detail.task.id}/knowledge`,
+                            {},
+                          );
+                          await after();
+                          setMessage(
+                            saved.action === "unchanged"
+                              ? "Knowledge เป็นข้อมูลล่าสุดแล้ว"
+                              : "บันทึก Knowledge จากงานที่ตรวจรับแล้ว",
+                          );
+                        })
+                      }
+                    >
+                      ซิงก์ Knowledge จากงานนี้
+                    </button>
+                  )}
+                {canReview && (
+                  <div className="actions">
+                    <button
+                      type="submit"
+                      form="task-review-form"
+                      className="primary"
+                      value="accept"
+                      disabled={busy}
+                    >
+                      ตรวจรับและบันทึก Knowledge
+                    </button>
+                    <button
+                      type="submit"
+                      form="task-review-form"
+                      value="revise"
+                      disabled={busy || detail.task.attempts >= 3}
+                    >
+                      ส่งกลับแก้ไข
+                    </button>
+                  </div>
+                )}
+                <button disabled={busy} onClick={() => setDetail(null)}>
+                  ปิด
+                </button>
+              </div>
+            </footer>
           </section>
         </div>
       )}
